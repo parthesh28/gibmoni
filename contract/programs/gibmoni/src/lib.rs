@@ -1,0 +1,64 @@
+use anchor_lang::prelude::*;
+
+mod instructions;
+mod state;
+mod errors;
+
+use instructions::*;
+use state::MilestoneType;
+
+declare_id!("7TNWhyi9pLp5dWQF1nHPoTNjosd5cCJQVqqPX3SHdXcP");
+
+#[program]
+pub mod gibmoni {
+    use super::*;
+
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.initialize(ctx.bumps)?;
+        Ok(())
+    }
+
+    pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {
+        ctx.accounts.initialize_user(ctx.bumps)?;
+        Ok(())
+    }
+    
+    pub fn create_project(ctx: Context<CreateProject>, args: CreateProjectArgs, task_id: u16) -> Result<()> {
+        ctx.accounts.create_project(args, task_id, ctx.bumps)?;
+        Ok(())
+    }
+
+    pub fn create_milestone(ctx: Context<CreateMilestone>, milestone_type: MilestoneType, task_id: u16) -> Result<()> {
+        ctx.accounts.create_milestone(milestone_type, task_id, ctx.bumps)?;
+        Ok(())
+    }
+
+    pub fn contribute_fund(ctx: Context<ContributeFund>, amount: u64) -> Result<()> {
+        ctx.accounts.contribute_fund(amount, ctx.bumps)?;
+        Ok(())
+    }
+
+    pub fn vote_on_milestone(ctx: Context<VoteOnMilestone>, approve: bool) -> Result<()> {
+        ctx.accounts.vote_on_milestone(approve, ctx.bumps)?;
+        Ok(())
+    }
+    pub fn approve_milestone(ctx: Context<ApproveMilestone>) -> Result<()> {
+        ctx.accounts.approve_milestone()?;
+        Ok(())
+    }
+
+    pub fn retry_milestone(ctx: Context<RetryMilestone>, task_id: u16) -> Result<()> {
+        ctx.accounts.retry_milestone(task_id, ctx.bumps)?;
+        Ok(())
+    }
+
+    pub fn claim_refund(ctx: Context<ClaimRefund>) -> Result<()> {
+        ctx.accounts.claim_refund()?;
+        Ok(())
+    }
+
+    pub fn cancel_unfunded_project(ctx: Context<CancelUnfundedProject>) -> Result<()> {
+        ctx.accounts.cancel_unfunded_project()?;
+        Ok(())
+    }
+}
