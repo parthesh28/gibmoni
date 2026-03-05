@@ -23,6 +23,8 @@
   "version": "0.0.0",
   "private": true,
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@helium/tuktuk-sdk": "^0.0.10",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-label": "^2.1.7",

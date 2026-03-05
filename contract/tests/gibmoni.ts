@@ -4,7 +4,7 @@ import { Gibmoni } from "../target/types/gibmoni";
 import { PublicKey, Keypair, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { assert } from "chai";
 import fs from "fs";
-import { init, taskKey, taskQueueAuthorityKey } from "../node_modules/@helium/tuktuk-sdk/lib/esm/src";
+import { init, taskKey, taskQueueAuthorityKey } from "@helium/tuktuk-sdk";
 
 const Logger = {
   header: (title: string) => console.log(`\n==================================================\n  ${title.toUpperCase()}\n==================================================`),
