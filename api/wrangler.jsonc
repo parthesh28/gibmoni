@@ -15,7 +15,7 @@
 	],
 	"d1_databases": [
 		{
-			"binding": "gibmoni_db",
+			"binding": "DB",
 			"database_name": "gibmoni-db",
 			"database_id": "9e282cb6-66db-44e3-a291-b1d43aac13db",
 			"remote": true,

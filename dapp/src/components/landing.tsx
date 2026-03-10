@@ -37,7 +37,7 @@ export default function LandingPage() {
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center w-full sm:w-auto">
                         <Link
-                            href="/create"
+                            href="/onboarding"
                             className="group flex items-center sm:w-auto bg-zinc-950 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-sm font-mono tracking-wider uppercase hover:opacity-90 transition-all"
                         >
                             <span className="flex items-center justify-center w-12 h-12 bg-[#ea580c] text-zinc-50 dark:text-zinc-900 transition-colors shrink-0">
