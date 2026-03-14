@@ -10,7 +10,27 @@ import { useAnchorProvider } from '../context/solanaProvider'
 import { useTransactionToast } from '../../components/transactionToast'
 import { toast } from 'sonner'
 import * as anchor from '@coral-xyz/anchor'
-import { taskKey, taskQueueAuthorityKey } from "@helium/tuktuk-sdk";
+
+// Browser-safe replacements for @helium/tuktuk-sdk PDA helpers
+// The originals use buf.writeUint16LE which doesn't exist in browser Buffer polyfills
+const TUKTUK_PROGRAM_ID = new PublicKey("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
+
+function localTaskKey(taskQueue: PublicKey, taskId: number): [PublicKey, number] {
+    const buf = Buffer.alloc(2);
+    buf[0] = taskId & 0xff;
+    buf[1] = (taskId >> 8) & 0xff;
+    return PublicKey.findProgramAddressSync(
+        [Buffer.from("task"), taskQueue.toBuffer(), buf],
+        TUKTUK_PROGRAM_ID
+    );
+}
+
+function localTaskQueueAuthorityKey(taskQueue: PublicKey, authority: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+        [Buffer.from("task_queue_authority"), taskQueue.toBuffer(), authority.toBuffer()],
+        TUKTUK_PROGRAM_ID
+    );
+}
 
 export function useGibmoniProgram() {
     const { connection } = useConnection()
@@ -23,7 +43,6 @@ export function useGibmoniProgram() {
 
     // Tuktuk Constants
     const taskQueue = new PublicKey("GnCH4xcCtPTqiHa3z76dPW4DX7toa6qCntNJVtwS5KZc");
-    const tuktukProgramId = new PublicKey("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
 
     const refreshProjectsData = () => {
         queryClient.invalidateQueries({ queryKey: ['get-all-projects'] })
@@ -40,6 +59,21 @@ export function useGibmoniProgram() {
         queryFn: async () => {
             return await program.account.project.all()
         }
+    })
+
+    // Check if the connected wallet has an on-chain User PDA
+    const getUserAccount = useQuery({
+        queryKey: ['user-account', provider.publicKey?.toBase58(), { cluster }],
+        queryFn: async () => {
+            if (!provider.publicKey) throw new Error('No wallet')
+            const [userPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("USER"), provider.publicKey.toBuffer()],
+                program.programId
+            );
+            return await program.account.user.fetch(userPda);
+        },
+        enabled: !!provider.publicKey,
+        retry: false,
     })
 
     // 1. Initialize User Profile
@@ -62,6 +96,7 @@ export function useGibmoniProgram() {
                 title: 'Profile Initialized!',
                 description: 'Your Gibmoni user profile has been created.'
             })
+            queryClient.invalidateQueries({ queryKey: ['user-account'] })
         },
         onError: (error) => {
             console.error('Init user error:', error)
@@ -89,13 +124,10 @@ export function useGibmoniProgram() {
                 program.programId
             );
 
-            const [queueAuthority] = PublicKey.findProgramAddressSync(
-                [Buffer.from("queue_authority")],
-                program.programId
-            );
+            const queueAuthority = new PublicKey("D7vF1s4o95EMr8XdCFh3BfrYK8EFTBnUYP8go6425fY3");
 
-            const [taskQueueAuthority] = taskQueueAuthorityKey(taskQueue, queueAuthority);
-            const [task] = taskKey(taskQueue, taskId);
+            const [taskQueueAuthority] = localTaskQueueAuthorityKey(taskQueue, queueAuthority);
+            const [task] = localTaskKey(taskQueue, taskId);
 
             return program.methods.createProject({
                 projectName: data.projectName,
@@ -111,7 +143,7 @@ export function useGibmoniProgram() {
                 task,
                 queueAuthority,
                 systemProgram: SystemProgram.programId,
-                tuktukProgram: tuktukProgramId
+                tuktukProgram: TUKTUK_PROGRAM_ID
             }).rpc()
         },
         onSuccess: (signature) => {
@@ -212,12 +244,9 @@ export function useGibmoniProgram() {
             );
 
             // Tuktuk task queue PDAs
-            const [queueAuthority] = PublicKey.findProgramAddressSync(
-                [Buffer.from("queue_authority")],
-                program.programId
-            );
-            const [taskQueueAuthority] = taskQueueAuthorityKey(taskQueue, queueAuthority);
-            const [task] = taskKey(taskQueue, taskId);
+            const queueAuthority = new PublicKey("D7vF1s4o95EMr8XdCFh3BfrYK8EFTBnUYP8go6425fY3");
+            const [taskQueueAuthority] = localTaskQueueAuthorityKey(taskQueue, queueAuthority);
+            const [task] = localTaskKey(taskQueue, taskId);
 
             return program.methods.createMilestone(data.milestoneType, taskId).accountsStrict({
                 milestoneAuthority: provider.publicKey,
@@ -230,7 +259,7 @@ export function useGibmoniProgram() {
                 task,
                 queueAuthority,
                 systemProgram: SystemProgram.programId,
-                tuktukProgram: tuktukProgramId
+                tuktukProgram: TUKTUK_PROGRAM_ID
             }).rpc({ skipPreflight: true }) // You had skipPreflight in your tests, so I preserved it here
         },
         onSuccess: (signature) => {
@@ -315,6 +344,7 @@ export function useGibmoniProgram() {
         programId,
         getProgramAccount,
         getAllProjects,
+        getUserAccount,
         initializeUser,
         createProject,
         contributeFund,

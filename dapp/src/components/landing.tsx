@@ -1,11 +1,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowRight } from "lucide-react";
+import Navbar from './navbar';
+import Footer from './footer';
 
 export default function LandingPage() {
     return (
         <main className="min-h-screen transition-colors duration-300">
-
+            <Navbar />
+            
             {/* ── HERO ── */}
             <section className="relative w-full px-6 pt-32 pb-20 lg:px-8 lg:pt-40 lg:pb-32 overflow-hidden">
 
@@ -17,7 +20,6 @@ export default function LandingPage() {
                 </div>
 
                 {/* Ghost $ — bottom right */}
-                {/* Ghost $ — bottom right, fully visible */}
                 <div className="absolute bottom-4 sm:bottom-6 right-4 sm:right-6 z-0 pointer-events-none select-none" aria-hidden="true">
                     <span className="block text-[15rem] sm:text-[12rem] md:text-[16rem] lg:text-[30rem] font-sans tracking-tighter leading-none text-transparent [-webkit-text-stroke:1.5px_#e4e4e7] dark:[-webkit-text-stroke:1.5px_#27272a] opacity-50 transition-colors duration-300">
                         $
@@ -44,7 +46,7 @@ export default function LandingPage() {
                                 <ArrowRight size={18} strokeWidth={2} className="transition-transform group-hover:translate-x-1" />
                             </span>
                             <span className="px-6 py-3 font-bold whitespace-nowrap flex-1 text-center sm:text-left">
-                                Get Started
+                                Sign Up / Log In
                             </span>
                         </Link>
                     </div>
@@ -140,6 +142,8 @@ export default function LandingPage() {
 
                 </div>
             </section>
+            
+            <Footer />
         </main>
     );
 }

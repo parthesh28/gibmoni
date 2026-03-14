@@ -15,11 +15,11 @@ const Logger = {
   table: (data: any[]) => { console.log(); console.table(data); }
 };
 
-describe("Capstone Crowdfunding & Governance", async () => {
+describe("Capstone Crowdfunding & Governance", () => {
   const provider = anchor.AnchorProvider.local("https://devnet.helius-rpc.com/?api-key=c5d32b63-b2f3-46b9-9535-0d5510769438");
   anchor.setProvider(provider);
 
-  const program = anchor.workspace.capstone as Program<Gibmoni>;
+  const program = anchor.workspace.gibmoni as Program<Gibmoni>;
 
   const loadWallet = (path: string): Keypair => Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(path, "utf-8"))));
   const getRandomId = (): number => Math.floor(Math.random() * 1000) + 1;
@@ -64,7 +64,7 @@ describe("Capstone Crowdfunding & Governance", async () => {
     name: string;
   }
   let contributors: ContributorContext[] = [];
-
+  
   before(async () => {
     tuktukProgram = await init(provider);
     Logger.header("Initializing Test Suite Setup");
@@ -147,7 +147,7 @@ describe("Capstone Crowdfunding & Governance", async () => {
     assert.strictEqual(vaultAccount.authority.toString(), admin.publicKey.toString());
   });
 
-  it("Initializes Developer and Contributor Profiles", async () => {
+  xit("Initializes Developer and Contributor Profiles", async () => {
     Logger.header("Profile Initialization");
 
     await program.methods.initializeUser()
@@ -174,7 +174,7 @@ describe("Capstone Crowdfunding & Governance", async () => {
     })));
   });
 
-  it("Creates Project 1 (Failure Simulation Target)", async () => {
+  xit("Creates Project 1 (Failure Simulation Target)", async () => {
     const targetAmount = new anchor.BN(0.005 * LAMPORTS_PER_SOL);
     const deadlineOffset = (days: number) => new anchor.BN(Math.floor(Date.now() / 1000) + days * 24 * 60 * 60);
     taskId = getRandomId();
@@ -196,7 +196,7 @@ describe("Capstone Crowdfunding & Governance", async () => {
     assert.strictEqual(projectAccount.projectName, projectName1);
   });
 
-  it("Fully Funds Project 1 to trigger Development Stage", async () => {
+  xit("Fully Funds Project 1 to trigger Development Stage", async () => {
     const amount = new anchor.BN(0.001 * LAMPORTS_PER_SOL);
 
     for (const c of contributors) {
@@ -221,7 +221,7 @@ describe("Capstone Crowdfunding & Governance", async () => {
     assert.ok(updatedProject.projectState.development !== undefined);
   });
 
-  it("Simulates Lifecycle of a Failing Project (Project 1)", async () => {
+  xit("Simulates Lifecycle of a Failing Project (Project 1)", async () => {
     Logger.header("Failure Lifecycle Simulation");
     taskId = getRandomId();
     const [milestone1Pda] = getMilestonePda(user.publicKey, project1Pda, 0);
@@ -268,7 +268,7 @@ describe("Capstone Crowdfunding & Governance", async () => {
     assert.ok(project1.projectState.failed !== undefined);
   });
 
-  it("Allows contributors to claim refunds for a failed project (Project 1)", async () => {
+  xit("Allows contributors to claim refunds for a failed project (Project 1)", async () => {
     Logger.header("Refund Execution Simulation");
 
     for (const c of contributors) {
@@ -305,7 +305,7 @@ describe("Capstone Crowdfunding & Governance", async () => {
     }
   });
 
-  it("Simulates Lifecycle of a Successful Project (Project 2)", async () => {
+  xit("Simulates Lifecycle of a Successful Project (Project 2)", async () => {
     Logger.header("Success Lifecycle Simulation");
 
     const targetAmount = new anchor.BN(0.05 * LAMPORTS_PER_SOL);

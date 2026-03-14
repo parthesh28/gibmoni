@@ -3,12 +3,12 @@ import Link from 'next/link';
 
 export function Footer() {
     return (
-        <footer className="w-full border-t-2 border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-zinc-950 bg-[radial-gradient(#e4e4e7_1px,transparent_1px)] dark:bg-[radial-gradient(#3f3f46_1px,transparent_1px)] [background-size:24px_24px] transition-colors duration-300">
-            <div className="max-w-7xl mx-auto px-6 py-12 lg:px-12">
+        <footer className="w-full border-t border-zinc-900 dark:border-zinc-400 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
+            <div className="max-w-7xl mx-auto px-6 py-8 lg:px-12">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
 
                     {/* Left Side: Brand & Copyright */}
-                    <div className="flex flex-col gap-2 font-mono">
+                    <div className="flex gap-4 items-baseline font-mono">
                         <span className="text-sm font-bold tracking-widest text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
                             GIBMONI
                         </span>

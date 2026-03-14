@@ -4,18 +4,20 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Terminal, Loader2, AlertTriangle } from 'lucide-react';
-// IMPORT YOUR WALLET BUTTON HERE (Adjust the path to match your folder structure)
 import { WalletButton } from "../context/solanaProvider";
+import { useGibmoniProgram } from '../hooks/useAnchorQueries';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
 
 export default function OnboardingPage() {
     const router = useRouter();
     const { publicKey, connected } = useWallet();
+    const { initializeUser, getUserAccount } = useGibmoniProgram();
 
     const [status, setStatus] = useState<'AWAITING_WALLET' | 'VERIFYING' | 'REGISTRATION_REQUIRED'>('AWAITING_WALLET');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [step, setStep] = useState<'FORM' | 'ON_CHAIN' | 'OFF_CHAIN' | 'DONE'>('FORM');
 
     const [formData, setFormData] = useState({
         alias: '',
@@ -38,6 +40,7 @@ export default function OnboardingPage() {
                 const res = await fetch(`${API_URL}/api/users/${publicKey.toBase58()}`);
 
                 if (res.ok) {
+                    // User exists in DB — redirect to dashboard
                     router.push('/dashboard');
                 } else if (res.status === 404) {
                     setStatus('REGISTRATION_REQUIRED');
@@ -60,7 +63,27 @@ export default function OnboardingPage() {
         setIsSubmitting(true);
         setError(null);
 
+        // STEP 1: Initialize on-chain User PDA (if not already initialized)
+        const hasOnChainUser = getUserAccount.data && !getUserAccount.isError;
+        if (!hasOnChainUser) {
+            try {
+                setStep('ON_CHAIN');
+                await initializeUser.mutateAsync();
+            } catch (err: any) {
+                // If PDA already exists, that's fine — continue
+                const errMsg = err?.message || String(err);
+                if (!errMsg.includes('already in use') && !errMsg.includes('0x0')) {
+                    setError('ON-CHAIN ERROR: Failed to initialize user PDA. ' + errMsg);
+                    setIsSubmitting(false);
+                    setStep('FORM');
+                    return;
+                }
+            }
+        }
+
+        // STEP 2: Save off-chain profile to API
         try {
+            setStep('OFF_CHAIN');
             const res = await fetch(`${API_URL}/api/users`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -74,22 +97,35 @@ export default function OnboardingPage() {
             });
 
             if (res.ok || res.status === 201) {
-                router.push('/dashboard');
+                setStep('DONE');
+                // Invalidate the user account query so it refetches
+                getUserAccount.refetch();
+                setTimeout(() => router.push('/dashboard'), 500);
             } else {
                 const data = await res.json();
-                setError(data.error || 'REGISTRATION_FAILED: Invalid payload.');
+                if (data.error === 'USER_ALREADY_EXISTS') {
+                    // Already registered, just redirect
+                    router.push('/dashboard');
+                } else {
+                    setError(data.error || 'REGISTRATION_FAILED: Invalid payload.');
+                    setStep('FORM');
+                }
             }
         } catch (err) {
             setError('NETWORK_ERROR: Registration payload dropped.');
+            setStep('FORM');
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    return (
-        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 bg-[radial-gradient(#e4e4e7_1px,transparent_1px)] dark:bg-[radial-gradient(#3f3f46_1px,transparent_1px)] [background-size:24px_24px] transition-colors duration-300 pt-24">
+    const stepLabels = ['FORM', 'ON_CHAIN', 'OFF_CHAIN', 'DONE'];
+    const stepIndex = stepLabels.indexOf(step);
 
-            <div className="w-full max-w-md bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-800 shadow-[8px_8px_0_0_#d4d4d8] dark:shadow-[8px_8px_0_0_#27272a] transition-all duration-300 relative z-10">
+    return (
+        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 transition-colors duration-300 pt-24">
+
+            <div className="w-full max-w-md bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-800 transition-all duration-300 relative z-10">
 
                 <div className="flex items-center justify-between px-4 py-3 border-b-2 border-zinc-300 dark:border-zinc-800 bg-zinc-200/50 dark:bg-zinc-900/50">
                     <div className="flex items-center gap-2">
@@ -107,7 +143,7 @@ export default function OnboardingPage() {
 
                 <div className="p-8">
 
-                    {/* STATE 1: Awaiting Wallet (UPDATED) */}
+                    {/* STATE 1: Awaiting Wallet */}
                     {status === 'AWAITING_WALLET' && (
                         <div className="flex flex-col items-center text-center py-8">
                             <div className="w-12 h-12 mb-6 border border-zinc-300 dark:border-zinc-800 flex items-center justify-center">
@@ -120,7 +156,6 @@ export default function OnboardingPage() {
                                  Awaiting wallet connection to verify identity on the Solana ledger.
                             </p>
 
-                            {/* THE MISSING BUTTON */}
                             <div className="p-1 border border-zinc-300 dark:border-zinc-800/50 bg-zinc-200/50 dark:bg-zinc-900/50 transition-colors duration-300 w-full flex justify-center">
                                 <WalletButton />
                             </div>
@@ -148,9 +183,25 @@ export default function OnboardingPage() {
                                     Init Profile
                                 </h2>
                                 <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400">
-                                    Wallet recognized. Off-chain profile missing.
+                                    Wallet recognized. Profile missing. Fill out your details and sign the on-chain initialization.
                                 </p>
                             </div>
+
+                            {/* Progress Steps (visible during submission) */}
+                            {isSubmitting && (
+                                <div className="flex items-center gap-1 mb-2">
+                                    {stepLabels.map((s, i) => (
+                                        <div key={s} className="flex items-center gap-1 flex-1">
+                                            <div className={`h-1 flex-1 transition-all duration-500 ${
+                                                i <= stepIndex ? 'bg-[#ea580c]' : 'bg-zinc-300 dark:bg-zinc-800'
+                                            }`}></div>
+                                            <span className={`text-[8px] font-mono tracking-widest ${
+                                                i === stepIndex ? 'text-[#ea580c]' : 'text-zinc-400 dark:text-zinc-600'
+                                            }`}>{s}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
 
                             {error && (
                                 <div className="p-3 border border-red-500/50 bg-red-500/10 flex items-center gap-3 text-red-600 dark:text-red-400 text-xs font-mono">
@@ -172,6 +223,7 @@ export default function OnboardingPage() {
                                     onChange={(e) => setFormData({ ...formData, alias: e.target.value })}
                                     className="w-full bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-800 px-4 py-3 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#ea580c] dark:focus:border-[#ea580c] focus:ring-1 focus:ring-[#ea580c] transition-all rounded-none"
                                     placeholder="e.g. 0xBuilder"
+                                    disabled={isSubmitting}
                                 />
                             </div>
 
@@ -187,6 +239,7 @@ export default function OnboardingPage() {
                                     onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                                     className="w-full bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-800 px-4 py-3 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#ea580c] dark:focus:border-[#ea580c] focus:ring-1 focus:ring-[#ea580c] transition-all rounded-none resize-none"
                                     placeholder="Brief description of what you build..."
+                                    disabled={isSubmitting}
                                 />
                             </div>
 
@@ -202,6 +255,7 @@ export default function OnboardingPage() {
                                         onChange={(e) => setFormData({ ...formData, githubUrl: e.target.value })}
                                         className="w-full bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-800 px-4 py-2.5 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#ea580c] transition-all rounded-none"
                                         placeholder="https://github.com/..."
+                                        disabled={isSubmitting}
                                     />
                                 </div>
                                 <div className="flex flex-col gap-2">
@@ -214,6 +268,7 @@ export default function OnboardingPage() {
                                         onChange={(e) => setFormData({ ...formData, twitterHandle: e.target.value })}
                                         className="w-full bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-800 px-4 py-2.5 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#ea580c] transition-all rounded-none"
                                         placeholder="@handle"
+                                        disabled={isSubmitting}
                                     />
                                 </div>
                             </div>
@@ -227,7 +282,7 @@ export default function OnboardingPage() {
                                 {isSubmitting ? (
                                     <>
                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span>Executing...</span>
+                                        <span>{step === 'ON_CHAIN' ? 'Sign Wallet Tx...' : step === 'OFF_CHAIN' ? 'Saving Profile...' : 'Executing...'}</span>
                                     </>
                                 ) : (
                                     <span>[ Initialize ]</span>

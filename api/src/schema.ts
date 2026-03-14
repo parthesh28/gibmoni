@@ -10,6 +10,8 @@ export const users = sqliteTable('users', {
     twitterHandle: text('twitter_handle'),
     bio: text('bio'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    githubScore: integer('github_score').default(0).notNull(),
+    walletScore: integer('wallet_score').default(0).notNull(),
 });
 
 // 2. PROJECTS: The Campaign Pitch

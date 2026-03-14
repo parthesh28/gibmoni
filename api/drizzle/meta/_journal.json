@@ -8,6 +8,13 @@
       "when": 1773056346928,
       "tag": "0000_wooden_gauntlet",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1773467888976,
+      "tag": "0001_brief_crusher_hogan",
+      "breakpoints": true
     }
   ]
 }
