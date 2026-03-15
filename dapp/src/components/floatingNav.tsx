@@ -2,13 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { Compass, Plus, User } from 'lucide-react';
-import { ThemeSelect } from './themeSelect';
+import { Compass, Plus } from 'lucide-react';
 
 export default function FloatingNav() {
     const pathname = usePathname();
-    const { publicKey } = useWallet();
 
     const navItems = [
         { href: '/dashboard', label: 'Explore', icon: Compass },
@@ -38,21 +35,6 @@ export default function FloatingNav() {
                         );
                     })}
                 </div>
-            </div>
-
-            {/* Top right corner: theme + profile */}
-            <div className="fixed top-4 right-4 lg:top-6 lg:right-6 z-50 flex items-center gap-2">
-                <ThemeSelect />
-                <Link
-                    href="/profile"
-                    className={`flex items-center justify-center w-9 h-9 border transition-all duration-200 ${
-                        pathname === '/profile'
-                            ? 'border-[#ea580c] bg-[#ea580c] text-white'
-                            : 'border-zinc-300 dark:border-zinc-800 bg-zinc-50/95 dark:bg-zinc-950/95 text-zinc-500 dark:text-zinc-400 hover:text-[#ea580c] dark:hover:text-[#ea580c] hover:border-[#ea580c]'
-                    } backdrop-blur-md`}
-                >
-                    <User className="w-4 h-4" />
-                </Link>
             </div>
         </>
     );

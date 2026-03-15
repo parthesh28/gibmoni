@@ -96,13 +96,21 @@ export default function CreateProjectPage() {
 
             if (!res.ok) {
                 const data = await res.json();
-                setError(`API_ERROR: ${data.error || 'Failed to save project metadata.'}`);
-                setStep('FORM');
+                console.error("API Error Response:", data);
+                setError(`API_WARNING: On-chain tx succeeded, but metadata API failed. Project exists on-chain. Resync later.`);
+                setStep('DONE'); // Proceed to DONE anyway since the core project is created on-chain
+                setTimeout(() => {
+                    router.push(`/project/${projectPda.toBase58()}`);
+                }, 3000);
                 return;
             }
         } catch (err) {
-            setError('NETWORK_ERROR: Could not reach the API to save metadata.');
-            setStep('FORM');
+            console.error("Network Error posting project metadata:", err);
+            setError('API_WARNING: On-chain tx succeeded, but network error syncing metadata. Project exists on chain.');
+            setStep('DONE');
+            setTimeout(() => {
+                router.push(`/project/${projectPda.toBase58()}`);
+            }, 3000);
             return;
         }
 

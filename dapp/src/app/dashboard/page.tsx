@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { Terminal, Loader2, Box, Users, Zap } from 'lucide-react';
+import { Terminal, Loader2, Box, Users, Zap, Search, Filter, X } from 'lucide-react';
 import { useGibmoniProgram } from '../hooks/useAnchorQueries';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import FloatingNav from '@/components/floatingNav';
@@ -76,6 +76,7 @@ export default function DashboardPage() {
     const { getAllProjects } = useGibmoniProgram();
     const [apiProjects, setApiProjects] = useState<ApiProject[]>([]);
     const [filter, setFilter] = useState<'ALL' | 'FUNDING'>('ALL');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Fetch off-chain project data from API
     useEffect(() => {
@@ -120,9 +121,24 @@ export default function DashboardPage() {
         };
     });
 
-    const filteredProjects = filter === 'FUNDING'
-        ? mergedProjects.filter(p => p.state === 'Funding')
-        : mergedProjects;
+    const filteredProjects = useMemo(() => {
+        let result = mergedProjects;
+        
+        if (filter === 'FUNDING') {
+            result = result.filter(p => p.state === 'Funding');
+        }
+        
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            result = result.filter(p => 
+                p.title.toLowerCase().includes(q) || 
+                (p.creatorAlias && p.creatorAlias.toLowerCase().includes(q)) ||
+                (p.category && p.category.toLowerCase().includes(q))
+            );
+        }
+        
+        return result;
+    }, [mergedProjects, filter, searchQuery]);
 
     return (
         <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300 px-6 lg:px-12 py-12 pb-28">
@@ -145,10 +161,11 @@ export default function DashboardPage() {
                     </p>
                 </div>
 
-                {/* Filter */}
-                <div className="flex gap-0 mb-8">
-                    <button
-                        onClick={() => setFilter('ALL')}
+                {/* Filters & Search */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div className="flex gap-0">
+                        <button
+                            onClick={() => setFilter('ALL')}
                         className={`px-5 py-2.5 text-[10px] font-mono tracking-widest uppercase border border-zinc-300 dark:border-zinc-700 transition-all duration-200 ${
                             filter === 'ALL'
                                 ? 'bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 border-zinc-900 dark:border-zinc-100'
@@ -172,6 +189,26 @@ export default function DashboardPage() {
                     </button>
                 </div>
 
+                <div className="relative w-full md:w-80">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                    <input
+                        type="text"
+                        placeholder="Search projects, builders, categories..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#ea580c] transition-colors"
+                    />
+                    {searchQuery && (
+                        <button 
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            </div>
+
                 {/* Loading */}
                 {loading && (
                     <div className="flex flex-col items-center justify-center py-32">
@@ -190,14 +227,18 @@ export default function DashboardPage() {
                             No Projects Found
                         </h3>
                         <p className="text-xs font-mono text-zinc-500 dark:text-zinc-500 mb-8 text-center max-w-md">
-                            {filter === 'FUNDING' ? 'No projects are currently seeking funding.' : 'The protocol has no registered projects yet. Be the first.'}
+                            {searchQuery ? `No projects match your search "${searchQuery}".` : 
+                             filter === 'FUNDING' ? 'No projects are currently seeking funding.' : 
+                             'The protocol has no registered projects yet. Be the first.'}
                         </p>
-                        <Link
-                            href="/create"
-                            className="bg-[#ea580c] text-white px-8 py-4 text-xs font-mono tracking-widest uppercase hover:bg-[#c2410c] transition-colors duration-200"
-                        >
-                            [ INIT_PROJECT ]
-                        </Link>
+                        {!searchQuery && (
+                            <Link
+                                href="/create"
+                                className="bg-[#ea580c] text-white px-8 py-4 text-xs font-mono tracking-widest uppercase hover:bg-[#c2410c] transition-colors duration-200"
+                            >
+                                [ INIT_PROJECT ]
+                            </Link>
+                        )}
                     </div>
                 )}
 

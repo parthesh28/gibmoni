@@ -76,6 +76,21 @@ export function useGibmoniProgram() {
         retry: false,
     })
 
+    const checkHasVoted = async (milestonePda: PublicKey, currentAttempt: number) => {
+        if (!provider.publicKey) return false;
+        try {
+            const [votePda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("VOTE"), milestonePda.toBuffer(), provider.publicKey.toBuffer()],
+                program.programId
+            );
+            const voteAccount = await program.account.vote.fetch(votePda);
+            // The user has only voted if the vote account's attempt_count matches the milestone's current attempt_number
+            return voteAccount.attemptCount === currentAttempt;
+        } catch {
+            return false;
+        }
+    };
+
     // 1. Initialize User Profile
     const initializeUser = useMutation({
         mutationKey: ['user', 'initializeUser', { cluster }],
@@ -349,6 +364,7 @@ export function useGibmoniProgram() {
         createProject,
         contributeFund,
         voteOnMilestone, 
-        createMilestone
+        createMilestone,
+        checkHasVoted
     }
 }

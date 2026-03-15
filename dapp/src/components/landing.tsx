@@ -1,15 +1,12 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowRight } from "lucide-react";
-import Navbar from './navbar';
 import Footer from './footer';
 
 export default function LandingPage() {
     return (
         <main className="min-h-screen transition-colors duration-300">
-            <Navbar />
-            
-            {/* ── HERO ── */}
+            {/* HERO */}
             <section className="relative w-full px-6 pt-32 pb-20 lg:px-8 lg:pt-40 lg:pb-32 overflow-hidden">
 
                 {/* Ghost /// — top left */}
