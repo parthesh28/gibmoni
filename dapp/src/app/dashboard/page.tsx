@@ -7,6 +7,7 @@ import { Terminal, Loader2, Box, Users, Zap, Search, Filter, X } from 'lucide-re
 import { useGibmoniProgram } from '../hooks/useAnchorQueries';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import FloatingNav from '@/components/floatingNav';
+import { PageHeader, SiteFrame } from '@/components/pageFrame';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
 
@@ -141,45 +142,35 @@ export default function DashboardPage() {
     }, [mergedProjects, filter, searchQuery]);
 
     return (
-        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300 px-6 lg:px-12 py-12 pb-28">
+        <SiteFrame contentClassName="pt-28 lg:pt-32 pb-28">
             <FloatingNav />
 
-            {/* Header */}
             <div className="max-w-7xl mx-auto">
-                <div className="mb-12">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Terminal className="w-5 h-5 text-[#ea580c]" />
-                        <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-zinc-400 dark:text-zinc-500">
-                            EXPLORE // ALL_NODES
-                        </span>
-                    </div>
-                    <h1 className="font-pixel text-4xl lg:text-5xl text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-4">
-                        Explore Projects
-                    </h1>
-                    <p className="text-sm font-mono text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
-                        Browse active campaigns on the GIBMONI protocol. All data pulled directly from the Solana ledger, enriched with off-chain metadata when available.
-                    </p>
-                </div>
+                <PageHeader
+                    eyebrow="EXPLORE // ALL_NODES"
+                    title="Explore Projects"
+                    description="Browse active campaigns on the GIBMONI protocol. All data is pulled directly from the Solana ledger and enriched with off-chain metadata when available."
+                />
 
                 {/* Filters & Search */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex gap-0">
                         <button
                             onClick={() => setFilter('ALL')}
-                        className={`px-5 py-2.5 text-[10px] font-mono tracking-widest uppercase border border-zinc-300 dark:border-zinc-700 transition-all duration-200 ${
+                        className={`border border-border/80 px-5 py-2.5 text-[10px] font-mono tracking-widest uppercase transition-all duration-200 ${
                             filter === 'ALL'
-                                ? 'bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 border-zinc-900 dark:border-zinc-100'
-                                : 'bg-transparent text-zinc-500 dark:text-zinc-400 hover:text-[#ea580c]'
+                                ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900'
+                                : 'bg-background text-zinc-500 hover:text-[#ea580c] dark:text-zinc-400'
                         }`}
                     >
                         All ({mergedProjects.length})
                     </button>
                     <button
                         onClick={() => setFilter('FUNDING')}
-                        className={`px-5 py-2.5 text-[10px] font-mono tracking-widest uppercase border border-l-0 border-zinc-300 dark:border-zinc-700 transition-all duration-200 ${
+                        className={`border border-l-0 border-border/80 px-5 py-2.5 text-[10px] font-mono tracking-widest uppercase transition-all duration-200 ${
                             filter === 'FUNDING'
                                 ? 'bg-[#ea580c] text-white border-[#ea580c]'
-                                : 'bg-transparent text-zinc-500 dark:text-zinc-400 hover:text-[#ea580c]'
+                                : 'bg-background text-zinc-500 hover:text-[#ea580c] dark:text-zinc-400'
                         }`}
                     >
                         <span className="flex items-center gap-1.5">
@@ -196,7 +187,7 @@ export default function DashboardPage() {
                         placeholder="Search projects, builders, categories..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#ea580c] transition-colors"
+                        className="app-input w-full pl-10 pr-10 py-2.5 text-xs font-mono"
                     />
                     {searchQuery && (
                         <button 
@@ -245,10 +236,11 @@ export default function DashboardPage() {
                 {/* Project Grid */}
                 {!loading && filteredProjects.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {filteredProjects.map((project) => (
+                        {filteredProjects.map((project, index) => (
                             <div
                                 key={project.id}
-                                className="border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 hover:border-zinc-400 dark:hover:border-zinc-700 transition-all duration-200 group flex flex-col"
+                                className="app-fade-up app-card-hover border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 hover:border-zinc-400 dark:hover:border-zinc-700 group flex flex-col"
+                                style={{ animationDelay: `${Math.min(260, index * 45)}ms` }}
                             >
                                 {/* Card Header */}
                                 <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-200 dark:border-zinc-800/50">
@@ -284,7 +276,7 @@ export default function DashboardPage() {
                                         </div>
                                         <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-800">
                                             <div
-                                                className="h-full bg-[#ea580c] transition-all duration-500"
+                                                className="app-shimmer-bar h-full bg-[#ea580c] transition-all duration-500"
                                                 style={{ width: `${project.progress}%` }}
                                             ></div>
                                         </div>
@@ -312,13 +304,13 @@ export default function DashboardPage() {
                                     href={`/project/${project.id}`}
                                     className="block w-full px-5 py-4 text-center text-[10px] font-mono tracking-widest uppercase border-t border-zinc-200 dark:border-zinc-800/50 text-zinc-500 dark:text-zinc-400 hover:bg-[#ea580c] hover:text-white hover:border-[#ea580c] transition-all duration-200"
                                 >
-                                    [ VIEW_NODE ]
+                                    View Project
                                 </Link>
                             </div>
                         ))}
                     </div>
                 )}
             </div>
-        </main>
+        </SiteFrame>
     );
 }

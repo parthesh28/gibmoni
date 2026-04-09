@@ -7,7 +7,9 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"test": "vitest",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"db:migrate:local": "wrangler d1 migrations apply gibmoni-db --local",
+		"db:migrate:remote": "wrangler d1 migrations apply gibmoni-db --remote"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.12.4",
@@ -15,7 +17,7 @@
 		"drizzle-kit": "^0.31.9",
 		"typescript": "^5.5.2",
 		"vitest": "~3.2.0",
-		"wrangler": "^4.71.0"
+		"wrangler": "^4.81.0"
 	},
 	"dependencies": {
 		"@hono/zod-validator": "^0.7.6",

@@ -16,7 +16,7 @@ import Navbar from '@/components/navbar'
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable} ${GeistPixelSquare.variable}`}>
-      <body className={`antialiased`}>
+      <body className="app-shell relative antialiased">
         <AppProviders>
           <Navbar />
           {children}

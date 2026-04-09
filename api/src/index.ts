@@ -12,6 +12,12 @@ export type Env = {
 
 const app = new Hono<{ Bindings: Env }>();
 
+const emptyToUndefined = (value: unknown) => {
+	if (typeof value !== 'string') return value;
+	const trimmed = value.trim();
+	return trimmed === '' ? undefined : trimmed;
+};
+
 // ==========================================
 // CORS
 // ==========================================
@@ -24,12 +30,12 @@ app.use('/api/*', cors({
 // VALIDATION SCHEMAS
 // ==========================================
 const userSchema = z.object({
-	walletAddress: z.string().min(32).max(44),
-	alias: z.string().min(2).max(50),
-	avatarUrl: z.string().url().optional().or(z.literal('')),
-	githubUrl: z.string().url().optional().or(z.literal('')),
-	twitterHandle: z.string().max(15).optional().or(z.literal('')),
-	bio: z.string().max(500).optional().or(z.literal('')),
+	walletAddress: z.string().trim().min(32).max(44),
+	alias: z.string().trim().min(2).max(50),
+	avatarUrl: z.preprocess(emptyToUndefined, z.string().url().optional()),
+	githubUrl: z.preprocess(emptyToUndefined, z.string().url().optional()),
+	twitterHandle: z.preprocess(emptyToUndefined, z.string().trim().max(50).optional()),
+	bio: z.preprocess(emptyToUndefined, z.string().trim().max(500).optional()),
 });
 
 const projectSchema = z.object({
@@ -108,7 +114,10 @@ app.get('/api/users/:wallet', async (c) => {
 // POST /api/users
 app.post('/api/users', zValidator('json', userSchema, (result, c) => {
 	if (!result.success) {
-		return c.json({ error: 'VALIDATION_FAILED', details: result.error.type }, 400);
+		return c.json({
+			error: 'VALIDATION_FAILED',
+			details: result.error.flatten(),
+		}, 400);
 	}
 }), async (c) => {
 	const body = c.req.valid('json');

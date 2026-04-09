@@ -8,6 +8,7 @@ import { useGibmoniProgram } from '../hooks/useAnchorQueries';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { WalletButton } from '../context/solanaProvider';
 import FloatingNav from '@/components/floatingNav';
+import { PageHeader, SiteFrame } from '@/components/pageFrame';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
 
@@ -100,41 +101,34 @@ export default function ProfilePage() {
     // Not connected
     if (!connected || !publicKey) {
         return (
-            <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 transition-colors duration-300">
+            <SiteFrame contentClassName="pt-28 lg:pt-32">
                 <FloatingNav />
-                <div className="w-full max-w-md border-2 border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
-                    <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-zinc-300 dark:border-zinc-800 bg-zinc-200/50 dark:bg-zinc-900/50">
-                        <Terminal className="w-4 h-4 text-zinc-500" />
-                        <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-600 dark:text-zinc-400">
-                            PROFILE.SYS // AUTH_REQUIRED
-                        </span>
-                    </div>
-                    <div className="p-10 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 mb-6 border border-zinc-300 dark:border-zinc-800 flex items-center justify-center">
+                <div className="mx-auto w-full max-w-md">
+                    <PageHeader
+                        eyebrow="PROFILE.SYS // AUTH_REQUIRED"
+                        title="Connect Wallet"
+                        description="Connect your wallet to view your on-chain profile, activity stats, and created projects."
+                    />
+                    <div className="app-surface p-10 text-center">
+                        <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center border border-border/80">
                             <User className="w-6 h-6 text-zinc-400" />
                         </div>
-                        <h2 className="font-pixel text-xl text-zinc-900 dark:text-zinc-100 mb-4 uppercase">
-                            Connect Wallet
-                        </h2>
-                        <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400 mb-8">
-                            Connect your wallet to view your on-chain profile and activity stats.
-                        </p>
                         <WalletButton />
                     </div>
                 </div>
-            </main>
+            </SiteFrame>
         );
     }
 
     if (loading || onChainLoading) {
         return (
-            <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+            <SiteFrame contentClassName="pt-28 lg:pt-32">
                 <FloatingNav />
                 <div className="text-center">
                     <Loader2 className="w-8 h-8 text-[#ea580c] animate-spin mx-auto mb-4" />
                     <p className="text-sm font-mono text-zinc-500 dark:text-zinc-400">LOADING PROFILE DATA...</p>
                 </div>
-            </main>
+            </SiteFrame>
         );
     }
 
@@ -147,20 +141,15 @@ export default function ProfilePage() {
     const lastActive = onChainUser ? new Date(Number(onChainUser.lastActiveTime) * 1000).toLocaleDateString() : 'N/A';
 
     return (
-        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300 px-6 lg:px-12 py-12 pb-28">
+        <SiteFrame contentClassName="pt-28 lg:pt-32 pb-28">
             <FloatingNav />
 
             <div className="max-w-5xl mx-auto">
-                {/* Header */}
-                <div className="mb-10">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Terminal className="w-5 h-5 text-[#ea580c]" />
-                        <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-zinc-400 dark:text-zinc-500">
-                            PROFILE.SYS // {publicKey.toBase58().slice(0, 6)}...{publicKey.toBase58().slice(-4)}
-                        </span>
-                        <div className="w-2 h-2 bg-[#ea580c] animate-pulse"></div>
-                    </div>
-                </div>
+                <PageHeader
+                    eyebrow={`PROFILE.SYS // ${publicKey.toBase58().slice(0, 6)}...${publicKey.toBase58().slice(-4)}`}
+                    title={profile?.alias || 'Anonymous'}
+                    description={profile?.bio || 'Your wallet profile, on-chain activity, and created projects all appear here.'}
+                />
 
                 {/* On-chain PDA Init Banner — shown if no User PDA found */}
                 {!hasOnChainUser && (
@@ -333,6 +322,6 @@ export default function ProfilePage() {
                     )}
                 </div>
             </div>
-        </main>
+        </SiteFrame>
     );
 }

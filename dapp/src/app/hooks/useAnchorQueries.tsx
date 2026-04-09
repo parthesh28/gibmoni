@@ -107,7 +107,7 @@ export function useGibmoniProgram() {
             }).rpc()
         },
         onSuccess: (signature) => {
-            transactionToast(signature, {
+            transactionToast(String(signature), {
                 title: 'Profile Initialized!',
                 description: 'Your Gibmoni user profile has been created.'
             })
@@ -162,7 +162,7 @@ export function useGibmoniProgram() {
             }).rpc()
         },
         onSuccess: (signature) => {
-            transactionToast(signature, {
+            transactionToast(String(signature), {
                 title: 'Project Created Successfully! 🎉',
                 description: 'Your project is now live and ready for contributions'
             })
@@ -211,7 +211,7 @@ export function useGibmoniProgram() {
             }).rpc()
         },
         onSuccess: (signature) => {
-            transactionToast(signature, {
+            transactionToast(String(signature), {
                 title: 'Contribution Successful!',
                 description: 'Your funds have been securely escrowed.'
             })
@@ -278,7 +278,7 @@ export function useGibmoniProgram() {
             }).rpc({ skipPreflight: true }) // You had skipPreflight in your tests, so I preserved it here
         },
         onSuccess: (signature) => {
-            transactionToast(signature, {
+            transactionToast(String(signature), {
                 title: 'Milestone Submitted!',
                 description: 'Your milestone is now active and awaiting community votes.'
             })
@@ -338,7 +338,7 @@ export function useGibmoniProgram() {
             }).rpc()
         },
         onSuccess: (signature, variables) => {
-            transactionToast(signature, {
+            transactionToast(String(signature), {
                 title: variables.decision ? 'Vote Cast: Approve! ✅' : 'Vote Cast: Reject ❌',
                 description: 'Your governance weight has been applied to the milestone.'
             })

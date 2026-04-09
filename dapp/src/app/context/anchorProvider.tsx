@@ -1,14 +1,16 @@
-import { AnchorProvider, Program } from '@coral-xyz/anchor'
+import { AnchorProvider, Idl, Program } from '@coral-xyz/anchor'
 import { Cluster, PublicKey } from '@solana/web3.js'
-import GibMoniIDL from '../../../../contract/target/idl/gibmoni.json'
-import type { Gibmoni } from '../../../../contract/target/types/gibmoni'
+import GibMoniIDL from '../../idl/gibmoni.json'
 
-export { Gibmoni, GibMoniIDL }
+export type Gibmoni = Idl & Record<string, any>
+export { GibMoniIDL }
 
-export const GIBMONI_PROGRAM_ID = new PublicKey(GibMoniIDL.address)
+const gibmoniIdl = GibMoniIDL as Idl & { address: string }
 
-export function getGibmoniProgram(provider: AnchorProvider, address?: PublicKey): Program<Gibmoni> {
-    return new Program({ ...GibMoniIDL, address: address ? address.toBase58() : GibMoniIDL.address } as Gibmoni, provider)
+export const GIBMONI_PROGRAM_ID = new PublicKey(gibmoniIdl.address)
+
+export function getGibmoniProgram(provider: AnchorProvider, address?: PublicKey): any {
+    return new Program({ ...gibmoniIdl, address: address ? address.toBase58() : gibmoniIdl.address } as Idl, provider) as any
 }
 
 export function getGibmoniProgramId(cluster: Cluster) {

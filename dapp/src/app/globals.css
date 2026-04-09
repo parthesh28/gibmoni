@@ -50,6 +50,8 @@
 
 :root {
   --radius: 0.625rem;
+  --brand: oklch(0.68 0.22 43.1);
+  --brand-foreground: oklch(0.985 0 0);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -150,4 +152,113 @@
 
 .font-sans {
   font-family: var(--font-sans);
+}
+
+@keyframes app-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes app-shimmer {
+  from {
+    transform: translateX(-120%);
+  }
+
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply relative isolate min-h-screen overflow-x-hidden bg-background text-foreground transition-colors duration-300;
+  }
+
+  .app-shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(circle at top left, rgba(234, 88, 12, 0.12), transparent 28%),
+      radial-gradient(circle at bottom right, rgba(63, 63, 70, 0.14), transparent 32%),
+      linear-gradient(to bottom, transparent, transparent);
+    opacity: 1;
+  }
+
+  .app-shell > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .app-surface {
+    @apply border border-border/80 bg-background/90 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.08)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.35)];
+  }
+
+  .app-surface-header {
+    @apply border-b border-border/70 bg-muted/40 px-5 py-3;
+  }
+
+  .app-eyebrow {
+    @apply font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground;
+  }
+
+  .app-title {
+    font-family: var(--font-pixel-square);
+    @apply text-3xl uppercase tracking-wider text-foreground sm:text-4xl lg:text-5xl;
+  }
+
+  .app-copy {
+    @apply font-mono text-sm leading-relaxed text-muted-foreground;
+  }
+
+  .app-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-none border border-[#ea580c] bg-[#ea580c] px-5 py-3 font-mono text-xs font-semibold tracking-widest uppercase text-white transition-colors hover:bg-[#c2410c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ea580c]/30;
+  }
+
+  .app-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-none border border-border/80 bg-background px-5 py-3 font-mono text-xs font-semibold tracking-widest uppercase text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ea580c]/25;
+  }
+
+  .app-input {
+    @apply border-border/80 bg-background text-foreground placeholder:text-muted-foreground focus:border-[#ea580c] focus:ring-2 focus:ring-[#ea580c]/20;
+  }
+
+  .app-fade-up {
+    animation: app-fade-up 0.45s ease-out both;
+  }
+
+  .app-card-hover {
+    @apply transition-all duration-300;
+  }
+
+  .app-card-hover:hover {
+    transform: translateY(-3px);
+  }
+
+  .app-shimmer-bar {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .app-shimmer-bar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+    animation: app-shimmer 2.4s linear infinite;
+    pointer-events: none;
+  }
+
+  .dark .app-shimmer-bar::after {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  }
 }
