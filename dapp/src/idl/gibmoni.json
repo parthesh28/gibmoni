@@ -1,0 +1,327 @@
+{
+  "address": "7TNWhyi9pLp5dWQF1nHPoTNjosd5cCJQVqqPX3SHdXcP",
+  "metadata": {
+    "name": "gibmoni",
+    "version": "0.1.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "accounts": [
+        { "name": "admin", "writable": true, "signer": true },
+        { "name": "vault", "writable": true },
+        { "name": "system_program" }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_user",
+      "discriminator": [111, 17, 185, 250, 60, 122, 38, 254],
+      "accounts": [
+        { "name": "user", "writable": true, "signer": true },
+        { "name": "user_account", "writable": true },
+        { "name": "system_program" }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_project",
+      "discriminator": [148, 219, 181, 42, 221, 114, 145, 190],
+      "accounts": [
+        { "name": "project_authority", "writable": true, "signer": true },
+        { "name": "project", "writable": true },
+        { "name": "user", "writable": true },
+        { "name": "task_queue", "writable": true },
+        { "name": "task_queue_authority" },
+        { "name": "task", "writable": true },
+        { "name": "queue_authority", "writable": true },
+        { "name": "system_program" },
+        { "name": "tuktuk_program" }
+      ],
+      "args": [
+        { "name": "args", "type": { "defined": { "name": "CreateProjectArgs" } } },
+        { "name": "task_id", "type": "u16" }
+      ]
+    },
+    {
+      "name": "create_milestone",
+      "discriminator": [239, 58, 201, 28, 40, 186, 173, 48],
+      "accounts": [
+        { "name": "milestone_authority", "writable": true, "signer": true },
+        { "name": "milestone", "writable": true },
+        { "name": "vault", "writable": true },
+        { "name": "project", "writable": true },
+        { "name": "user", "writable": true },
+        { "name": "task_queue", "writable": true },
+        { "name": "task_queue_authority" },
+        { "name": "task", "writable": true },
+        { "name": "queue_authority", "writable": true },
+        { "name": "system_program" },
+        { "name": "tuktuk_program" }
+      ],
+      "args": [
+        { "name": "milestone_type", "type": { "defined": { "name": "MilestoneType" } } },
+        { "name": "task_id", "type": "u16" }
+      ]
+    },
+    {
+      "name": "contribute_fund",
+      "discriminator": [247, 7, 157, 147, 147, 134, 238, 101],
+      "accounts": [
+        { "name": "funder", "writable": true, "signer": true },
+        { "name": "vault", "writable": true },
+        { "name": "project", "writable": true },
+        { "name": "user", "writable": true },
+        { "name": "contribution", "writable": true },
+        { "name": "system_program" }
+      ],
+      "args": [
+        { "name": "amount", "type": "u64" }
+      ]
+    },
+    {
+      "name": "vote_on_milestone",
+      "discriminator": [199, 58, 102, 230, 114, 211, 69, 169],
+      "accounts": [
+        { "name": "voter", "writable": true, "signer": true },
+        { "name": "user", "writable": true },
+        { "name": "project" },
+        { "name": "milestone", "writable": true },
+        { "name": "contribution" },
+        { "name": "vote", "writable": true },
+        { "name": "system_program" }
+      ],
+      "args": [
+        { "name": "approve", "type": "bool" }
+      ]
+    },
+    {
+      "name": "approve_milestone",
+      "discriminator": [145, 85, 92, 60, 50, 130, 219, 106],
+      "accounts": [
+        { "name": "project", "writable": true },
+        { "name": "milestone", "writable": true },
+        { "name": "user", "writable": true },
+        { "name": "vault", "writable": true },
+        { "name": "project_authority", "writable": true },
+        { "name": "system_program" }
+      ],
+      "args": []
+    },
+    {
+      "name": "retry_milestone",
+      "discriminator": [56, 66, 158, 4, 104, 61, 172, 236],
+      "accounts": [
+        { "name": "milestone_authority", "writable": true, "signer": true },
+        { "name": "project", "writable": true },
+        { "name": "milestone", "writable": true },
+        { "name": "user", "writable": true },
+        { "name": "vault", "writable": true },
+        { "name": "task_queue", "writable": true },
+        { "name": "task_queue_authority" },
+        { "name": "task", "writable": true },
+        { "name": "queue_authority", "writable": true },
+        { "name": "system_program" },
+        { "name": "tuktuk_program" }
+      ],
+      "args": [
+        { "name": "task_id", "type": "u16" }
+      ]
+    },
+    {
+      "name": "claim_refund",
+      "discriminator": [15, 16, 30, 161, 255, 228, 97, 60],
+      "accounts": [
+        { "name": "funder", "writable": true, "signer": true },
+        { "name": "vault", "writable": true },
+        { "name": "project", "writable": true },
+        { "name": "user", "writable": true },
+        { "name": "contribution", "writable": true },
+        { "name": "system_program" }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_unfunded_project",
+      "discriminator": [13, 161, 156, 212, 112, 41, 71, 24],
+      "accounts": [
+        { "name": "project", "writable": true }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    { "name": "Vault", "discriminator": [211, 8, 232, 43, 2, 152, 117, 119] },
+    { "name": "User", "discriminator": [159, 117, 95, 227, 239, 151, 58, 236] },
+    { "name": "Project", "discriminator": [205, 168, 189, 202, 181, 247, 142, 19] },
+    { "name": "Milestone", "discriminator": [38, 210, 239, 177, 85, 184, 10, 44] },
+    { "name": "Contribution", "discriminator": [182, 187, 14, 111, 72, 167, 242, 212] },
+    { "name": "Vote", "discriminator": [96, 91, 104, 57, 145, 35, 172, 155] }
+  ],
+  "events": [],
+  "errors": [
+    { "code": 6000, "name": "ZeroAmount", "msg": "Amount cannot be zero." },
+    { "code": 6001, "name": "InvalidProject", "msg": "Project is invalid" },
+    { "code": 6002, "name": "InvalidMilestoneType", "msg": "Invalid milestone type provided." },
+    { "code": 6003, "name": "ProjectNotFunding", "msg": "Project is not in funding stage anymore." },
+    { "code": 6004, "name": "ProjectNotDeveloping", "msg": "Project is not in developing stage rightnow." },
+    { "code": 6005, "name": "ProjectExpired", "msg": "Project funding deadline is execeeded." },
+    { "code": 6006, "name": "Overflow", "msg": "Numerical overflow." },
+    { "code": 6007, "name": "NotVotingStage", "msg": "Milestone is not in voting stage." },
+    { "code": 6008, "name": "ProjectNotFailed", "msg": "Project not in failed state" },
+    { "code": 6009, "name": "NoContribution", "msg": "No contribution found for the given user." },
+    { "code": 6010, "name": "AlreadyRefunded", "msg": "Refund already claimed by the user." },
+    { "code": 6011, "name": "InsufficientFunds", "msg": "Insufficient funds in vault." },
+    { "code": 6012, "name": "NotDisapproved", "msg": "You can only retry a milestone in Disapprove stage." },
+    { "code": 6013, "name": "MaxAttemptsReached", "msg": "Maximum number of attempts for the milestone have been reached." },
+    { "code": 6014, "name": "NotEnoughTimeLeft", "msg": "There is not enough time left to conduct a full vote." },
+    { "code": 6015, "name": "InvalidMilestoneCount", "msg": "Invalid milestone count." },
+    { "code": 6016, "name": "AlreadyVoted", "msg": "Vote has been already casted." },
+    { "code": 6017, "name": "InvalidDeadline", "msg": "Given deadline is invalid." },
+    { "code": 6018, "name": "DeadlineNotPassed", "msg": "Deadline has not passed yet." },
+    { "code": 6019, "name": "TargetAlreadyReached", "msg": "Target amount has already been reached." }
+  ],
+  "types": [
+    {
+      "name": "CreateProjectArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "project_name", "type": "string" },
+          { "name": "target_amount", "type": "u64" },
+          { "name": "funding_deadline", "type": "i64" },
+          { "name": "delivery_deadline", "type": "i64" }
+        ]
+      }
+    },
+    {
+      "name": "ProjectState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "Funding" },
+          { "name": "Development" },
+          { "name": "Failed" },
+          { "name": "Completed" }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "Voting" },
+          { "name": "Approved" },
+          { "name": "Disapproved" }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "Design" },
+          { "name": "Development" },
+          { "name": "Testing" },
+          { "name": "Deployment" }
+        ]
+      }
+    },
+    {
+      "name": "Vault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "type": "pubkey" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "User",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "contributed_amount", "type": "u64" },
+          { "name": "votes_casted", "type": "u64" },
+          { "name": "projects_posted", "type": "u64" },
+          { "name": "milestones_succeeded", "type": "u64" },
+          { "name": "projects_succeeded", "type": "u64" },
+          { "name": "time_joined", "type": "i64" },
+          { "name": "last_active_time", "type": "i64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "Project",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "project_authority", "type": "pubkey" },
+          { "name": "project_name", "type": "string" },
+          { "name": "target_amount", "type": "u64" },
+          { "name": "collected_amount", "type": "u64" },
+          { "name": "withdrawn_amount", "type": "u64" },
+          { "name": "project_state", "type": { "defined": { "name": "ProjectState" } } },
+          { "name": "milestones_posted", "type": "u8" },
+          { "name": "milestones_completed", "type": "u8" },
+          { "name": "funding_deadline", "type": "i64" },
+          { "name": "delivery_deadline", "type": "i64" },
+          { "name": "funder_count", "type": "u32" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "Milestone",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "project_id", "type": "pubkey" },
+          { "name": "attempt_number", "type": "u8" },
+          { "name": "milestone_status", "type": { "defined": { "name": "MilestoneState" } } },
+          { "name": "milestone_type", "type": { "defined": { "name": "MilestoneType" } } },
+          { "name": "votes_casted", "type": "u32" },
+          { "name": "capital_casted", "type": "u64" },
+          { "name": "voting_end_time", "type": "i64" },
+          { "name": "vote_against_weight", "type": "u64" },
+          { "name": "vote_for_weight", "type": "u64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "Contribution",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "funder", "type": "pubkey" },
+          { "name": "project", "type": "pubkey" },
+          { "name": "amount", "type": "u64" },
+          { "name": "refunded", "type": "bool" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "Vote",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "voter", "type": "pubkey" },
+          { "name": "project_id", "type": "pubkey" },
+          { "name": "milestone_id", "type": "pubkey" },
+          { "name": "decision", "type": "bool" },
+          { "name": "weight", "type": "u64" },
+          { "name": "attempt_count", "type": "u8" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    }
+  ]
+}

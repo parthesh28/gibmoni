@@ -2,12 +2,13 @@ import React from 'react';
 import Link from 'next/link';
 import { ArrowRight } from "lucide-react";
 import Footer from './footer';
+import { SiteFrame } from './pageFrame';
 
 export default function LandingPage() {
     return (
-        <main className="min-h-screen transition-colors duration-300">
+        <SiteFrame contentClassName="pt-28 lg:pt-32 pb-0">
             {/* HERO */}
-            <section className="relative w-full px-6 pt-32 pb-20 lg:px-8 lg:pt-40 lg:pb-32 overflow-hidden">
+            <section className="relative flex min-h-[calc(100vh-11rem)] w-full items-center justify-center overflow-hidden px-6 pb-20 lg:min-h-[calc(100vh-9rem)] lg:px-8 lg:pb-32">
 
                 {/* Ghost /// — top left */}
                 <div className="absolute top-20 -left-4 sm:-left-2 lg:left-0 z-0 pointer-events-none select-none" aria-hidden="true">
@@ -24,7 +25,7 @@ export default function LandingPage() {
                 </div>  
 
                 {/* Hero content */}
-                <div className="relative z-10 flex flex-col items-center text-center max-w-5xl mx-auto">
+                <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center text-center">
                     <h1 className="font-pixel text-4xl sm:text-5xl md:text-6xl lg:text-8xl tracking-widest text-zinc-900 dark:text-zinc-100 mb-2 select-none uppercase transition-colors duration-300">
                         Pitch. Raise.
                     </h1>
@@ -37,7 +38,7 @@ export default function LandingPage() {
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center w-full sm:w-auto">
                         <Link
                             href="/onboarding"
-                            className="group flex items-center sm:w-auto bg-zinc-950 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-sm font-mono tracking-wider uppercase hover:opacity-90 transition-all"
+                            className="group flex items-center sm:w-auto bg-zinc-950 text-zinc-100 text-sm font-mono tracking-wider uppercase hover:opacity-90 transition-all dark:bg-zinc-100 dark:text-zinc-900"
                         >
                             <span className="flex items-center justify-center w-12 h-12 bg-[#ea580c] text-zinc-50 dark:text-zinc-900 transition-colors shrink-0">
                                 <ArrowRight size={18} strokeWidth={2} className="transition-transform group-hover:translate-x-1" />
@@ -141,6 +142,6 @@ export default function LandingPage() {
             </section>
             
             <Footer />
-        </main>
+        </SiteFrame>
     );
 }

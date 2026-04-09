@@ -9,6 +9,8 @@ import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import { WalletButton } from '../context/solanaProvider';
 import FloatingNav from '@/components/floatingNav';
+import { PageHeader, SiteFrame } from '@/components/pageFrame';
+import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
 
@@ -123,59 +125,50 @@ export default function CreateProjectPage() {
     // Not connected
     if (!connected || !publicKey) {
         return (
-            <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 transition-colors duration-300">
+            <SiteFrame contentClassName="pt-28 lg:pt-32">
                 <FloatingNav />
-                <div className="w-full max-w-md border-2 border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
-                    <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-zinc-300 dark:border-zinc-800 bg-zinc-200/50 dark:bg-zinc-900/50">
-                        <Terminal className="w-4 h-4 text-zinc-500" />
-                        <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-600 dark:text-zinc-400">
-                            CREATE.SYS // AUTH_REQUIRED
-                        </span>
-                    </div>
-                    <div className="p-10 flex flex-col items-center text-center">
-                        <div className="w-12 h-12 mb-6 border border-zinc-300 dark:border-zinc-800 flex items-center justify-center">
-                            <div className="w-4 h-4 bg-[#ea580c] animate-ping opacity-75"></div>
+                <div className="mx-auto w-full max-w-md">
+                    <PageHeader
+                        eyebrow="CREATE.SYS // AUTH_REQUIRED"
+                        title="Connect Wallet"
+                        description="Wallet connection is required to initialize a project on the Solana ledger."
+                        actions={
+                            <>
+                                <Link href="/dashboard" className="app-secondary">Explore</Link>
+                                <Link href="/profile" className="app-secondary">Profile</Link>
+                            </>
+                        }
+                    />
+                    <div className="app-surface p-8 text-center">
+                        <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center border border-border/80">
+                            <div className="h-4 w-4 animate-ping bg-[#ea580c] opacity-75"></div>
                         </div>
-                        <h2 className="font-pixel text-xl text-zinc-900 dark:text-zinc-100 mb-4 uppercase">
-                            Connect Wallet
-                        </h2>
-                        <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400 mb-8">
-                            Wallet connection required to initialize a project on the Solana ledger.
-                        </p>
                         <WalletButton />
                     </div>
                 </div>
-            </main>
+            </SiteFrame>
         );
     }
 
     return (
-        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300 px-6 lg:px-12 py-12 pb-28">
+        <SiteFrame contentClassName="pt-28 lg:pt-32 pb-28">
             <FloatingNav />
 
             <div className="max-w-3xl mx-auto">
-                {/* Header */}
-                <div className="mb-10">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Terminal className="w-5 h-5 text-[#ea580c]" />
-                        <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-zinc-400 dark:text-zinc-500">
-                            CREATE.SYS // INIT_PROJECT
-                        </span>
-                    </div>
+                <PageHeader
+                    eyebrow="CREATE.SYS // INIT_PROJECT"
+                    title="Create Project"
+                    description="Define the project parameters once, then the app handles the on-chain transaction and off-chain metadata sync."
+                />
 
-                    {/* Progress dots */}
-                    <div className="flex items-center gap-3 mb-6">
-                        {(['FORM', 'SIGNING', 'POSTING', 'DONE'] as const).map((s, i) => (
-                            <div key={s} className="flex items-center gap-2">
-                                <div className={`w-2.5 h-2.5 transition-all ${
-                                    step === s ? (s === 'DONE' ? 'bg-green-500' : 'bg-[#ea580c] animate-pulse') :
-                                    (['FORM', 'SIGNING', 'POSTING', 'DONE'].indexOf(step) > i ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-700')
-                                }`}></div>
-                                <span className="text-[9px] font-mono text-zinc-400 uppercase hidden sm:inline">{s}</span>
-                                {i < 3 && <div className="w-6 h-px bg-zinc-300 dark:bg-zinc-700 hidden sm:block"></div>}
-                            </div>
-                        ))}
-                    </div>
+                <div className="mb-10 flex items-center gap-3">
+                    {(['FORM', 'SIGNING', 'POSTING', 'DONE'] as const).map((s, i) => (
+                        <div key={s} className="flex items-center gap-2">
+                            <div className={`h-2.5 w-2.5 transition-all ${step === s ? (s === 'DONE' ? 'bg-green-500' : 'bg-[#ea580c] animate-pulse') : (['FORM', 'SIGNING', 'POSTING', 'DONE'].indexOf(step) > i ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-700')}`}></div>
+                            <span className="hidden text-[9px] uppercase text-zinc-400 font-mono sm:inline">{s}</span>
+                            {i < 3 && <div className="hidden h-px w-6 bg-zinc-300 dark:bg-zinc-700 sm:block"></div>}
+                        </div>
+                    ))}
                 </div>
 
                 {/* Success State */}
@@ -354,6 +347,6 @@ export default function CreateProjectPage() {
                     </div>
                 )}
             </div>
-        </main>
+        </SiteFrame>
     );
 }

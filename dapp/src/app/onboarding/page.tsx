@@ -6,6 +6,8 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { Terminal, Loader2, AlertTriangle } from 'lucide-react';
 import { WalletButton } from "../context/solanaProvider";
 import { useGibmoniProgram } from '../hooks/useAnchorQueries';
+import { PageHeader, SiteFrame } from '@/components/pageFrame';
+import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
 
@@ -41,7 +43,7 @@ export default function OnboardingPage() {
 
                 if (res.ok) {
                     // User exists in DB — redirect to dashboard
-                    router.push('/dashboard');
+                    router.replace('/dashboard');
                 } else if (res.status === 404) {
                     setStatus('REGISTRATION_REQUIRED');
                 } else {
@@ -100,12 +102,12 @@ export default function OnboardingPage() {
                 setStep('DONE');
                 // Invalidate the user account query so it refetches
                 getUserAccount.refetch();
-                setTimeout(() => router.push('/dashboard'), 500);
+                setTimeout(() => router.replace('/dashboard'), 500);
             } else {
                 const data = await res.json();
                 if (data.error === 'USER_ALREADY_EXISTS') {
                     // Already registered, just redirect
-                    router.push('/dashboard');
+                    router.replace('/dashboard');
                 } else {
                     setError(data.error || 'REGISTRATION_FAILED: Invalid payload.');
                     setStep('FORM');
@@ -123,11 +125,18 @@ export default function OnboardingPage() {
     const stepIndex = stepLabels.indexOf(step);
 
     return (
-        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 transition-colors duration-300 pt-24">
+        <SiteFrame contentClassName="pt-28 lg:pt-32">
 
-            <div className="w-full max-w-md bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-800 transition-all duration-300 relative z-10">
+            <div className="mx-auto w-full max-w-md">
+                <PageHeader
+                    eyebrow="AUTH.SYS // ROOT"
+                    title="Onboarding"
+                    description="Connect a wallet and create the account record the app needs to route you into the dashboard."
+                />
 
-                <div className="flex items-center justify-between px-4 py-3 border-b-2 border-zinc-300 dark:border-zinc-800 bg-zinc-200/50 dark:bg-zinc-900/50">
+                <div className="app-surface transition-all duration-300 relative z-10">
+
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border/80 bg-muted/40">
                     <div className="flex items-center gap-2">
                         <Terminal className="w-4 h-4 text-zinc-500" />
                         <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-600 dark:text-zinc-400">
@@ -292,7 +301,8 @@ export default function OnboardingPage() {
                     )}
 
                 </div>
+                </div>
             </div>
-        </main>
+        </SiteFrame>
     );
 }

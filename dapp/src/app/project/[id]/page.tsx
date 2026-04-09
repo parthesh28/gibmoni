@@ -8,6 +8,7 @@ import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import Link from 'next/link';
 import FloatingNav from '@/components/floatingNav';
+import { SiteFrame } from '@/components/pageFrame';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
 
@@ -334,19 +335,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
     if (loading) {
         return (
-            <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+            <SiteFrame contentClassName="pt-28 lg:pt-32">
                 <FloatingNav />
                 <div className="text-center">
                     <Loader2 className="w-8 h-8 text-[#ea580c] animate-spin mx-auto mb-4" />
                     <p className="text-sm font-mono text-zinc-500 dark:text-zinc-400">LOADING PROJECT NODE...</p>
                 </div>
-            </main>
+            </SiteFrame>
         );
     }
 
     if (error && !onChainData) {
         return (
-            <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center px-4">
+            <SiteFrame contentClassName="pt-28 lg:pt-32">
                 <FloatingNav />
                 <div className="border-2 border-red-500/30 p-12 max-w-md text-center">
                     <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-4" />
@@ -355,12 +356,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         ← BACK TO EXPLORE
                     </Link>
                 </div>
-            </main>
+            </SiteFrame>
         );
     }
 
     return (
-        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300 px-6 lg:px-12 py-12 pb-28">
+        <SiteFrame contentClassName="pt-28 lg:pt-32 pb-28">
             <FloatingNav />
 
             <div className="max-w-6xl mx-auto flex flex-col gap-6">
@@ -375,7 +376,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     {/* Left Column (Main Info) */}
                     <div className="flex-1 flex flex-col gap-6 w-full">
                         {/* Title Bar */}
-                        <div className="border-2 border-zinc-300 dark:border-zinc-800 p-8 lg:p-10 flex flex-col md:flex-row md:items-start justify-between gap-6 w-full shadow-[8px_8px_0_0_#27272a] dark:shadow-none bg-zinc-100 dark:bg-zinc-900/20">
+                        <div className="app-surface app-fade-up p-8 lg:p-10 flex flex-col md:flex-row md:items-start justify-between gap-6 w-full bg-background/90">
                             <div className="flex flex-col gap-2">
                                 <div className="flex items-center gap-3 mb-2">
                                     <Terminal className="w-5 h-5 text-[#ea580c]" />
@@ -420,7 +421,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                         {/* Description */}
                         {offChainData?.description && (
-                            <div className="border-2 border-zinc-300 dark:border-zinc-800 p-8 lg:p-10">
+                            <div className="app-surface app-fade-up p-8 lg:p-10" style={{ animationDelay: '80ms' }}>
                                 <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500 block mb-6">PROJECT // README</span>
                                 <div className="text-sm font-mono text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap max-w-3xl">
                                     {offChainData.description}
@@ -433,7 +434,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <div className="w-full xl:w-[350px] flex flex-col gap-6 shrink-0">
                         {/* Vault Card */}
                         {onChainData && (
-                            <div className="border-2 border-zinc-300 dark:border-zinc-800 p-6 flex flex-col gap-6">
+                            <div className="app-surface app-fade-up p-6 flex flex-col gap-6" style={{ animationDelay: '120ms' }}>
                                 <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500 block">VAULT STATUS</span>
 
                                 <div className="flex justify-between items-end">
@@ -442,7 +443,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 </div>
 
                                 <div className="w-full h-2.5 bg-zinc-200 dark:bg-zinc-800">
-                                    <div className="h-full bg-[#ea580c] transition-all duration-700" style={{ width: `${progress}%` }}></div>
+                                    <div className="app-shimmer-bar h-full bg-[#ea580c] transition-all duration-700" style={{ width: `${progress}%` }}></div>
                                 </div>
 
                                 <div className="flex justify-between text-[9px] font-mono text-zinc-400">
@@ -457,14 +458,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                         className="w-full mt-2 py-3 border border-[#ea580c] text-[#ea580c] hover:bg-[#ea580c] hover:text-white text-[10px] font-mono tracking-widest uppercase transition-all duration-200 flex items-center justify-center gap-2"
                                     >
                                         <Coins className="w-3.5 h-3.5" />
-                                        [ FUND_PROJECT ]
+                                        Fund Project
                                     </button>
                                 )}
                             </div>
                         )}
 
                         {/* Network Details */}
-                        <div className="border-2 border-zinc-300 dark:border-zinc-800 p-6 flex flex-col gap-5">
+                        <div className="app-surface app-fade-up p-6 flex flex-col gap-5" style={{ animationDelay: '180ms' }}>
                             <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500 block">NETWORK DETAILS</span>
 
                             <div className="flex flex-col gap-1.5">
@@ -487,7 +488,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 </div>
 
                 {/* Milestone Timeline Array */}
-                <div className="border-2 border-zinc-300 dark:border-zinc-800 p-8 lg:p-10 mt-2">
+                <div className="app-surface app-fade-up p-8 lg:p-10 mt-2" style={{ animationDelay: '220ms' }}>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                         <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500 flex items-center gap-2">
                             <Clock className="w-4 h-4 text-[#ea580c]" />
@@ -504,7 +505,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 className="px-6 py-3 border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-white text-[10px] font-mono tracking-widest uppercase transition-all duration-200 flex items-center gap-2"
                             >
                                 <Plus className="w-3.5 h-3.5" />
-                                [ ADD_MILESTONE ]
+                                Add Milestone
                             </button>
                         )}
                     </div>
@@ -520,11 +521,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             return (
                                 <div
                                     key={index}
-                                    className={`border border-zinc-300 dark:border-zinc-800 p-5 relative flex flex-col gap-4 ${
+                                    className={`app-fade-up app-card-hover border border-zinc-300 dark:border-zinc-800 p-5 relative flex flex-col gap-4 ${
                                         isActive 
                                             ? 'bg-zinc-50 dark:bg-zinc-900/30' 
                                             : 'bg-zinc-100/50 dark:bg-zinc-950/50 opacity-50'
                                     }`}
+                                    style={{ animationDelay: `${260 + index * 55}ms` }}
                                 >
                                     <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
                                         <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500">
@@ -562,13 +564,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                         </div>
                                     )}
 
-                                    {/* Status icon */}
-                                    <div className="absolute top-5 right-5">
-                                        {status === 'Approved' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                                        {status === 'Disapproved' && <XCircle className="w-4 h-4 text-red-500" />}
-                                        {isVoting && <Clock className="w-4 h-4 text-yellow-500 animate-pulse" />}
-                                    </div>
-
                                     {/* Vote button (Contextual) */}
                                     {isVoting && hasContribution && connected && !isCreator && (
                                         <button
@@ -581,7 +576,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                             }`}
                                         >
                                             <Terminal className="w-3.5 h-3.5" />
-                                            {userVotes.get(index) ? '[ VOTE_CAST ]' : '[ CAST_VOTE ]'}
+                                            {userVotes.get(index) ? 'Vote Submitted' : 'Cast Vote'}
                                         </button>
                                     )}
                                 </div>
@@ -594,7 +589,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 {showFundModal && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <div className="absolute inset-0 bg-zinc-950/60 backdrop-blur-sm" onClick={() => setShowFundModal(false)} />
-                        <div className="w-full max-w-sm bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-800 shadow-[8px_8px_0_0_#27272a] relative z-10">
+                        <div className="w-full max-w-sm app-surface relative z-10">
                             <div className="px-5 py-3 border-b-2 border-zinc-300 dark:border-zinc-800 bg-zinc-200/50 dark:bg-zinc-900/50">
                                 <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-600 dark:text-zinc-400">FUND // ESCROW</span>
                             </div>
@@ -617,13 +612,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                         disabled={actionLoading || !fundAmount}
                                         className="flex-1 bg-[#ea580c] text-white py-3 text-[10px] font-mono tracking-widest uppercase hover:bg-[#c2410c] transition-colors disabled:opacity-50"
                                     >
-                                        {actionLoading ? 'SIGNING...' : '[ CONFIRM ]'}
+                                        {actionLoading ? 'SIGNING...' : 'Confirm'}
                                     </button>
                                     <button
                                         onClick={() => setShowFundModal(false)}
                                         className="px-4 py-3 border border-zinc-300 dark:border-zinc-700 text-[10px] font-mono tracking-widest uppercase text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
                                     >
-                                        [ CANCEL ]
+                                        Cancel
                                     </button>
                                 </div>
                             </div>
@@ -671,11 +666,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 <div className="flex gap-2 mt-2">
                                     <button onClick={handleCreateMilestone} disabled={actionLoading || !milestoneTitle || !milestoneDescription}
                                         className="flex-1 bg-yellow-500 text-white py-3 text-[10px] font-mono tracking-widest uppercase hover:bg-yellow-600 transition-colors disabled:opacity-50">
-                                        {actionLoading ? 'SIGNING...' : '[ DEPLOY ]'}
+                                        {actionLoading ? 'SIGNING...' : 'Submit'}
                                     </button>
                                     <button onClick={() => setShowMilestoneModal(false)}
                                         className="px-4 py-3 border border-zinc-300 dark:border-zinc-700 text-[10px] font-mono tracking-widest uppercase text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-                                        [ CANCEL ]
+                                        Cancel
                                     </button>
                                 </div>
                             </div>
@@ -698,22 +693,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 <div className="flex gap-2">
                                     <button onClick={() => handleVote(true)} disabled={actionLoading}
                                         className="flex-1 bg-green-600 text-white py-3 text-[10px] font-mono tracking-widest uppercase hover:bg-green-700 transition-colors disabled:opacity-50">
-                                        {actionLoading ? '...' : '[ APPROVE ]'}
+                                        {actionLoading ? '...' : 'Approve'}
                                     </button>
                                     <button onClick={() => handleVote(false)} disabled={actionLoading}
                                         className="flex-1 bg-red-600 text-white py-3 text-[10px] font-mono tracking-widest uppercase hover:bg-red-700 transition-colors disabled:opacity-50">
-                                        {actionLoading ? '...' : '[ REJECT ]'}
+                                        {actionLoading ? '...' : 'Reject'}
                                     </button>
                                 </div>
                                 <button onClick={() => setShowVoteModal(false)}
                                     className="mt-3 w-full py-2 text-[10px] font-mono tracking-widest uppercase text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-                                    [ CANCEL ]
+                                    Cancel
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
             </div>
-        </main>
+        </SiteFrame>
     );
 }
