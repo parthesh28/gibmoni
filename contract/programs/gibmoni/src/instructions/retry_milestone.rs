@@ -46,6 +46,13 @@ pub struct RetryMilestone<'info> {
         bump = vault.bump
     )]
     pub vault: Account<'info, Vault>,
+    
+    #[account(
+        mut,
+        seeds = [TREASURY_SEED],
+        bump = treasury.bump
+    )]
+    pub treasury: Account<'info, Treasury>,
 
     //tuktuk
     #[account(mut)]
@@ -116,6 +123,7 @@ impl<'info> RetryMilestone<'info> {
                     milestone: self.milestone.key(),
                     user: self.user.key(),
                     vault: self.vault.key(),
+                    treasury: self.treasury.key(), 
                     project_authority: self.milestone_authority.key(),
                     system_program: self.system_program.key(),
                 }

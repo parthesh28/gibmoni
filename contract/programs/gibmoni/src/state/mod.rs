@@ -15,3 +15,6 @@ pub use vote::*;
 
 pub mod user;
 pub use user::*;
+
+pub mod treasury;
+pub use treasury::*;

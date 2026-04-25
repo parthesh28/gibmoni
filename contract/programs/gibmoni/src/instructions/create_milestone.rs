@@ -1,6 +1,6 @@
 use crate::{
     errors::Error,
-    state::{PROJECT_SEED, Project, ProjectState, USER_SEED, User, VAULT_SEED, Vault, milestone::*},
+    state::{PROJECT_SEED, Project, ProjectState, TREASURY_SEED, Treasury, USER_SEED, User, VAULT_SEED, Vault, milestone::*},
 };
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::{prelude::*, InstructionData};
@@ -36,6 +36,13 @@ pub struct CreateMilestone<'info> {
         bump = vault.bump
     )]
     pub vault: Account<'info, Vault>,
+
+    #[account(
+        mut,
+        seeds = [TREASURY_SEED],
+        bump = treasury.bump
+    )]
+    pub treasury: Account<'info, Treasury>,
 
     #[account(
         mut,
@@ -130,6 +137,7 @@ impl<'info> CreateMilestone<'info> {
                     milestone: self.milestone.key(),
                     user: self.user.key(),
                     vault: self.vault.key(),
+                    treasury: self.treasury.key(), 
                     project_authority: self.milestone_authority.key(),
                     system_program: self.system_program.key(),
                 }

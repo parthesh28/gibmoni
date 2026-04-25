@@ -33,6 +33,13 @@ pub struct ApproveMilestone<'info> {
     )]
     pub vault: Account<'info, Vault>,
 
+    #[account(
+        mut,
+        seeds = [TREASURY_SEED],
+        bump = treasury.bump
+    )]
+    pub treasury: Account<'info, Treasury>,
+
     /// CHECK: only sending SOL to the exact pubkey stored in the Project state
     #[account(
         mut,
@@ -104,6 +111,16 @@ impl<'info> ApproveMilestone<'info> {
                 self.project.collected_amount.checked_div(4).ok_or(Error::Overflow)?
             };
 
+            let fee_amount = payout_amount
+                .checked_mul(2)
+                .ok_or(Error::Overflow)?
+                .checked_div(100)
+                .ok_or(Error::Overflow)?;
+
+            let developer_amount = payout_amount
+                .checked_sub(fee_amount)
+                .ok_or(Error::Overflow)?;
+
             **self.vault.to_account_info().lamports.borrow_mut() = self
                 .vault
                 .to_account_info()
@@ -114,8 +131,20 @@ impl<'info> ApproveMilestone<'info> {
             **self.project_authority.lamports.borrow_mut() = self
                 .project_authority
                 .lamports()
-                .checked_add(payout_amount)
+                .checked_add(developer_amount)
                 .ok_or(Error::Overflow)?;
+
+            **self.treasury.to_account_info().lamports.borrow_mut() = self
+                .treasury
+                .to_account_info()
+                .lamports()
+                .checked_add(fee_amount)
+                .ok_or(Error::Overflow)?;
+
+            self.treasury.total_fees_collected = self
+                .treasury
+                .total_fees_collected
+                .saturating_add(fee_amount);
 
             self.project.withdrawn_amount =
                 self.project.withdrawn_amount.saturating_add(payout_amount);

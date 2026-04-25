@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::state::{VAULT_SEED, Vault};
+use crate::state::{Treasury, Vault, TREASURY_SEED, VAULT_SEED};
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -16,6 +16,14 @@ pub struct Initialize<'info> {
     )]
     pub vault: Account<'info, Vault>,
 
+    #[account(
+        init,
+        payer = admin,
+        space = Treasury::DISCRIMINATOR.len() + Treasury::INIT_SPACE,
+        seeds = [TREASURY_SEED],
+        bump
+    )]
+    pub treasury: Account<'info, Treasury>,
     pub system_program: Program<'info, System>,
 }
 
@@ -24,6 +32,12 @@ impl<'info> Initialize<'info> {
         self.vault.set_inner(Vault {
             authority: self.admin.key(),
             bump: bumps.vault,
+        });
+
+        self.treasury.set_inner(Treasury {
+            authority: self.admin.key(),
+            total_fees_collected: 0,
+            bump: bumps.treasury,
         });
 
         Ok(())
