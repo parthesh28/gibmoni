@@ -101,6 +101,11 @@ impl<'info> CreateMilestone<'info> {
             Error::InvalidMilestoneCount
         );
 
+        require!(
+            (milestone_type as u8) == self.project.milestones_posted,
+            Error::InvalidMilestoneOrder
+        );
+
         self.milestone.set_inner(Milestone {
             project_id: self.project.key(),
             attempt_number: 1,

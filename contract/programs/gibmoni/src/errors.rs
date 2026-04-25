@@ -61,4 +61,7 @@ pub enum Error {
 
     #[msg("Target amount has already been reached.")]
     TargetAlreadyReached,
+
+    #[msg("Milestones must be created in the correct chronological order.")]
+    InvalidMilestoneOrder,
 }
