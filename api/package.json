@@ -11,6 +11,7 @@
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.12.4",
+		"@types/bs58": "^4.0.4",
 		"@types/node": "^25.3.3",
 		"drizzle-kit": "^0.31.9",
 		"typescript": "^5.5.2",
@@ -19,8 +20,10 @@
 	},
 	"dependencies": {
 		"@hono/zod-validator": "^0.7.6",
+		"bs58": "^6.0.0",
 		"drizzle-orm": "^0.45.1",
 		"hono": "^4.12.5",
+		"tweetnacl": "^1.0.3",
 		"zod": "^4.3.6"
 	}
 }

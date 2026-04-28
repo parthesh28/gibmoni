@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
+import nacl from 'tweetnacl';
+import bs58 from 'bs58';
 import { users, projects, milestones } from './schema';
 
 export type Env = {
@@ -12,54 +14,74 @@ export type Env = {
 
 const app = new Hono<{ Bindings: Env }>();
 
-// ==========================================
-// CORS
-// ==========================================
+function authenticateRequest(walletAddress: string, signatureBase58: string, messageString: string) {
+	try {
+		const publicKey = bs58.decode(walletAddress);
+		const signature = bs58.decode(signatureBase58);
+		const message = new TextEncoder().encode(messageString);
+
+		const isValid = nacl.sign.detached.verify(message, signature, publicKey);
+		if (!isValid) return { ok: false, error: 'INVALID_SIGNATURE' };
+
+		const parts = messageString.split(':');
+		const timestampStr = parts[parts.length - 1];
+		const timestamp = parseInt(timestampStr, 10);
+
+		if (isNaN(timestamp)) return { ok: false, error: 'INVALID_MESSAGE_FORMAT' };
+
+		const now = Date.now();
+		const twoMinutes = 2 * 60 * 1000;
+		if (Math.abs(now - timestamp) > twoMinutes) {
+			return { ok: false, error: 'SIGNATURE_EXPIRED' };
+		}
+
+		return { ok: true };
+	} catch (e) {
+		return { ok: false, error: 'MALFORMED_AUTH_PAYLOAD' };
+	}
+}
+
 app.use('/api/*', cors({
 	origin: '*',
 	allowMethods: ['GET', 'POST', 'OPTIONS'],
 }));
 
-// ==========================================
-// VALIDATION SCHEMAS
-// ==========================================
 const userSchema = z.object({
 	walletAddress: z.string().min(32).max(44),
-	alias: z.string().min(2).max(50),
+	alias: z.string().min(2).max(50),	
 	avatarUrl: z.string().url().optional().or(z.literal('')),
 	githubUrl: z.string().url().optional().or(z.literal('')),
 	twitterHandle: z.string().max(15).optional().or(z.literal('')),
 	bio: z.string().max(500).optional().or(z.literal('')),
+	signature: z.string().min(1),
+	message: z.string().min(1),
 });
 
 const projectSchema = z.object({
-	id: z.string().min(32).max(44),            // Stringified PDA pubkey
+	id: z.string().min(32).max(44),
 	creatorWallet: z.string().min(32).max(44),
 	title: z.string().min(1).max(100),
 	tagline: z.string().min(1).max(200),
 	description: z.string().min(1).max(5000),
 	category: z.string().max(50).optional().or(z.literal('')),
 	coverImageUrl: z.string().url().optional().or(z.literal('')),
+	signature: z.string().min(1), 
+	message: z.string().min(1),
 });
 
 const milestoneSchema = z.object({
-	id: z.string().min(1).max(100),            // Unique identifier
-	projectId: z.string().min(32).max(44),      // Project PDA pubkey
+	id: z.string().min(1).max(100),
+	projectId: z.string().min(32).max(44),
+	creatorWallet: z.string().min(32).max(44), 
 	milestoneIndex: z.number().int().min(0).max(3),
 	title: z.string().min(1).max(100),
 	description: z.string().min(1).max(2000),
+	signature: z.string().min(1), 
+	message: z.string().min(1), 
 });
 
-// ==========================================
-// SYSTEM CHECK
-// ==========================================
 app.get('/', (c) => c.text('GIBMONI API // SYSTEM ONLINE'));
 
-// ==========================================
-// USER ROUTES
-// ==========================================
-
-// GET /api/users/:wallet/projects — MUST be before /:wallet to avoid route collision
 app.get('/api/users/:wallet/projects', async (c) => {
 	const wallet = c.req.param('wallet');
 	if (wallet.length < 32 || wallet.length > 44) {
@@ -87,7 +109,6 @@ app.get('/api/users/:wallet/projects', async (c) => {
 	}
 });
 
-// GET /api/users/:wallet
 app.get('/api/users/:wallet', async (c) => {
 	const wallet = c.req.param('wallet');
 	if (wallet.length < 32 || wallet.length > 44) {
@@ -105,13 +126,16 @@ app.get('/api/users/:wallet', async (c) => {
 	}
 });
 
-// POST /api/users
 app.post('/api/users', zValidator('json', userSchema, (result, c) => {
 	if (!result.success) {
 		return c.json({ error: 'VALIDATION_FAILED', details: result.error.type }, 400);
 	}
 }), async (c) => {
 	const body = c.req.valid('json');
+
+	const auth = authenticateRequest(body.walletAddress, body.signature, body.message);
+	if (!auth.ok) return c.json({ error: auth.error }, 401);
+
 	const db = drizzle(c.env.DB);
 
 	try {
@@ -137,11 +161,6 @@ app.post('/api/users', zValidator('json', userSchema, (result, c) => {
 	}
 });
 
-// ==========================================
-// PROJECT ROUTES
-// ==========================================
-
-// GET /api/projects — List all projects with creator alias
 app.get('/api/projects', async (c) => {
 	try {
 		const db = drizzle(c.env.DB);
@@ -168,7 +187,6 @@ app.get('/api/projects', async (c) => {
 	}
 });
 
-// GET /api/projects/:id — Single project with milestones
 app.get('/api/projects/:id', async (c) => {
 	const id = c.req.param('id');
 
@@ -207,13 +225,16 @@ app.get('/api/projects/:id', async (c) => {
 	}
 });
 
-// POST /api/projects — Create project record (after on-chain tx)
 app.post('/api/projects', zValidator('json', projectSchema, (result, c) => {
 	if (!result.success) {
 		return c.json({ error: 'VALIDATION_FAILED', details: result.error.type }, 400);
 	}
 }), async (c) => {
 	const body = c.req.valid('json');
+
+	const auth = authenticateRequest(body.creatorWallet, body.signature, body.message);
+	if (!auth.ok) return c.json({ error: auth.error }, 401);
+
 	const db = drizzle(c.env.DB);
 
 	try {
@@ -240,17 +261,16 @@ app.post('/api/projects', zValidator('json', projectSchema, (result, c) => {
 	}
 });
 
-// ==========================================
-// MILESTONE ROUTES
-// ==========================================
-
-// POST /api/milestones — Create milestone record (after on-chain tx)
 app.post('/api/milestones', zValidator('json', milestoneSchema, (result, c) => {
 	if (!result.success) {
 		return c.json({ error: 'VALIDATION_FAILED', details: result.error.type }, 400);
 	}
 }), async (c) => {
 	const body = c.req.valid('json');
+
+	const auth = authenticateRequest(body.creatorWallet, body.signature, body.message);
+	if (!auth.ok) return c.json({ error: auth.error }, 401);
+
 	const db = drizzle(c.env.DB);
 
 	try {
@@ -279,7 +299,4 @@ app.post('/api/milestones', zValidator('json', milestoneSchema, (result, c) => {
 		return c.json({ error: 'CREATE_MILESTONE_FAILED' }, 500);
 	}
 });
-
-// User projects route moved to top of user routes section (before :wallet catch-all)
-
 export default app;
