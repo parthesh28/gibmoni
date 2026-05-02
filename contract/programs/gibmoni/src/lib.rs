@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 
-mod instructions;
-mod state;
 mod errors;
 mod helpers;
+mod instructions;
+mod state;
 
 use instructions::*;
 use state::MilestoneType;
@@ -19,18 +19,33 @@ pub mod gibmoni {
         Ok(())
     }
 
-    // pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {
-    //     ctx.accounts.initialize_user(ctx.bumps)?;
-    //     Ok(())
-    // }
-    
-    pub fn create_project(ctx: Context<CreateProject>, args: CreateProjectArgs, task_id: u16) -> Result<()> {
+    pub fn initialize_user(
+        ctx: Context<InitializeUser>,
+        wallet_score: u16,
+        github_score: u16,
+        score_timestamp: i64,
+        oracle_signature: [u8; 64],
+    ) -> Result<()> {
+        ctx.accounts.initialize_user(wallet_score, github_score, score_timestamp, oracle_signature, ctx.bumps)?;
+        Ok(())
+    }
+
+    pub fn create_project(
+        ctx: Context<CreateProject>,
+        args: CreateProjectArgs,
+        task_id: u16,
+    ) -> Result<()> {
         ctx.accounts.create_project(args, task_id, ctx.bumps)?;
         Ok(())
     }
 
-    pub fn create_milestone(ctx: Context<CreateMilestone>, milestone_type: MilestoneType, task_id: u16) -> Result<()> {
-        ctx.accounts.create_milestone(milestone_type, task_id, ctx.bumps)?;
+    pub fn create_milestone(
+        ctx: Context<CreateMilestone>,
+        milestone_type: MilestoneType,
+        task_id: u16,
+    ) -> Result<()> {
+        ctx.accounts
+            .create_milestone(milestone_type, task_id, ctx.bumps)?;
         Ok(())
     }
 
