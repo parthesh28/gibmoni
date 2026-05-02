@@ -1,9 +1,7 @@
-// src/schema.ts
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
-// 1. USERS: The Builders and Backers
 export const users = sqliteTable('users', {
-    walletAddress: text('wallet_address').primaryKey(), // The exact Solana pubkey
+    walletAddress: text('wallet_address').primaryKey(), 
     alias: text('alias').notNull(),
     avatarUrl: text('avatar_url'),
     githubUrl: text('github_url'),
@@ -14,9 +12,8 @@ export const users = sqliteTable('users', {
     walletScore: integer('wallet_score').default(0).notNull(),
 });
 
-// 2. PROJECTS: The Campaign Pitch
 export const projects = sqliteTable('projects', {
-    id: text('id').primaryKey(), // The stringified Solana PDA Pubkey of the project
+    id: text('id').primaryKey(), 
     creatorWallet: text('creator_wallet').references(() => users.walletAddress).notNull(),
     title: text('title').notNull(),
     tagline: text('tagline').notNull(),
@@ -26,14 +23,13 @@ export const projects = sqliteTable('projects', {
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
-// 3. MILESTONES: The Deliverables & Proof of Work
 export const milestones = sqliteTable('milestones', {
     id: text('id').primaryKey(),
     projectId: text('project_id').references(() => projects.id).notNull(),
-    milestoneIndex: integer('milestone_index').notNull(), // 0, 1, 2... matches the on-chain array
+    milestoneIndex: integer('milestone_index').notNull(), 
     title: text('title').notNull(),
     description: text('description').notNull(),
-    proofUrl: text('proof_url'), // Populated when the builder requests an unlock vote
+    proofUrl: text('proof_url'), 
     proofNotes: text('proof_notes'),
     updatedAt: integer('updated_at', { mode: 'timestamp' }),
 });

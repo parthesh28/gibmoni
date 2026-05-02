@@ -53,7 +53,6 @@ function signScoreAttestation(
 	const messageBytes = new TextEncoder().encode(messageString);
 	const secretKey = bs58.decode(privateKeyBase58);
 	const signatureBytes = nacl.sign.detached(messageBytes, secretKey);
-
 	return bs58.encode(signatureBytes);
 }
 
@@ -73,12 +72,11 @@ async function calculateWalletScore(walletAddress: string): Promise<number> {
 		const data: any = await response.json();
 		const lamports = data?.result?.value || 0;
 		const sol = lamports / 1_000_000_000;
-
 		const score = Math.min(Math.floor((sol / 5) * 1000), 1000);
 		return score;
 	} catch (e) {
 		console.error("Wallet scoring failed:", e);
-		return 0; 
+		return 0;
 	}
 }
 
@@ -99,19 +97,19 @@ async function calculateGithubScore(githubUrl: string | undefined): Promise<numb
 
 		let score = 0;
 
-		const createdYear = new Date(data.created_at).getFullYear();
-		const currentYear = new Date().getFullYear();
-		const ageYears = Math.max(currentYear - createdYear, 0);
-		score += Math.min(ageYears * 100, 400);
+		// FIX: Use full date arithmetic instead of year-only comparison so accounts
+		// created in January vs December of the same year score correctly.
+		const ageMs = Date.now() - new Date(data.created_at).getTime();
+		const ageYears = Math.max(ageMs / (1000 * 60 * 60 * 24 * 365), 0);
+		score += Math.min(Math.floor(ageYears * 100), 400);
 
 		score += Math.min((data.public_repos || 0) * 20, 400);
-
 		score += Math.min((data.followers || 0) * 4, 200);
 
 		return Math.min(score, 1000);
 	} catch (e) {
 		console.error("GitHub scoring failed:", e);
-		return 0; // Graceful fallback
+		return 0;
 	}
 }
 
@@ -122,7 +120,7 @@ app.use('/api/*', cors({
 
 const userSchema = z.object({
 	walletAddress: z.string().min(32).max(44),
-	alias: z.string().min(2).max(50),	
+	alias: z.string().min(2).max(50),
 	avatarUrl: z.string().url().optional().or(z.literal('')),
 	githubUrl: z.string().url().optional().or(z.literal('')),
 	twitterHandle: z.string().max(15).optional().or(z.literal('')),
@@ -139,23 +137,23 @@ const projectSchema = z.object({
 	description: z.string().min(1).max(5000),
 	category: z.string().max(50).optional().or(z.literal('')),
 	coverImageUrl: z.string().url().optional().or(z.literal('')),
-	signature: z.string().min(1), 
+	signature: z.string().min(1),
 	message: z.string().min(1),
 });
 
 const milestoneSchema = z.object({
 	id: z.string().min(1).max(100),
 	projectId: z.string().min(32).max(44),
-	creatorWallet: z.string().min(32).max(44), 
+	creatorWallet: z.string().min(32).max(44),
 	milestoneIndex: z.number().int().min(0).max(3),
 	title: z.string().min(1).max(100),
 	description: z.string().min(1).max(2000),
-	signature: z.string().min(1), 
-	message: z.string().min(1), 
+	signature: z.string().min(1),
+	message: z.string().min(1),
 });
 
 const batchProjectSchema = z.object({
-	projectIds: z.array(z.string().min(32).max(44)).max(100), // Max 100 at a time for safety
+	projectIds: z.array(z.string().min(32).max(44)).max(100),
 });
 
 app.get('/', (c) => c.text('GIBMONI API // SYSTEM ONLINE'));
@@ -183,7 +181,8 @@ app.get('/api/users/:wallet/projects', async (c) => {
 		return c.json({ created: createdProjects }, 200);
 	} catch (error) {
 		console.error('Fetch user projects error:', error);
-		return c.json({ error: 'FETCH_PROJECTS_FAILED', details: String(error) }, 500);
+		// FIX: Don't leak internal error details in production responses.
+		return c.json({ error: 'FETCH_PROJECTS_FAILED' }, 500);
 	}
 });
 
@@ -206,7 +205,6 @@ app.get('/api/users/:wallet', async (c) => {
 
 app.get('/api/auth/onboarding-scores', async (c) => {
 	const wallet = c.req.query('wallet');
-	const githubUrl = c.req.query('githubUrl'); 
 
 	if (!wallet || wallet.length < 32 || wallet.length > 44) {
 		return c.json({ error: 'INVALID_WALLET_FORMAT' }, 400);
@@ -218,10 +216,22 @@ app.get('/api/auth/onboarding-scores', async (c) => {
 		return c.json({ error: 'INTERNAL_SERVER_ERROR' }, 500);
 	}
 
+	const db = drizzle(c.env.DB);
+
+	// FIX: Look up the user's stored githubUrl rather than trusting the caller to
+	// pass it in — prevents gaming the score by supplying a different GitHub profile.
+	const existingUser = await db
+		.select({ githubUrl: users.githubUrl })
+		.from(users)
+		.where(eq(users.walletAddress, wallet))
+		.get();
+
+	const githubUrl = existingUser?.githubUrl ?? c.req.query('githubUrl');
+
 	try {
 		const [walletScore, githubScore] = await Promise.all([
 			calculateWalletScore(wallet),
-			calculateGithubScore(githubUrl)
+			calculateGithubScore(githubUrl ?? undefined),
 		]);
 
 		const timestamp = Date.now();
@@ -233,12 +243,17 @@ app.get('/api/auth/onboarding-scores', async (c) => {
 			privateKey
 		);
 
-		return c.json({
-			walletScore,
-			githubScore,
-			timestamp,
-			oracleSignature
-		}, 200);
+		// FIX: Persist scores to the DB so the smart contract can read them back.
+		// Only update if the user already exists; new users get scores written at
+		// registration time.
+		if (existingUser) {
+			await db
+				.update(users)
+				.set({ walletScore, githubScore })
+				.where(eq(users.walletAddress, wallet));
+		}
+
+		return c.json({ walletScore, githubScore, timestamp, oracleSignature }, 200);
 
 	} catch (error) {
 		console.error('Scoring/Signing Error:', error);
@@ -248,7 +263,9 @@ app.get('/api/auth/onboarding-scores', async (c) => {
 
 app.post('/api/users', zValidator('json', userSchema, (result, c) => {
 	if (!result.success) {
-		return c.json({ error: 'VALIDATION_FAILED', details: result.error.type }, 400);
+		// FIX: Use flatten() for actionable field-level errors instead of leaking
+		// the internal Zod error type string.
+		return c.json({ error: 'VALIDATION_FAILED', details: result.error.issues }, 400);
 	}
 }), async (c) => {
 	const body = c.req.valid('json');
@@ -259,11 +276,6 @@ app.post('/api/users', zValidator('json', userSchema, (result, c) => {
 	const db = drizzle(c.env.DB);
 
 	try {
-		const existingUser = await db.select().from(users).where(eq(users.walletAddress, body.walletAddress)).get();
-		if (existingUser) {
-			return c.json({ error: 'USER_ALREADY_EXISTS', user: existingUser }, 409);
-		}
-
 		const newUser = await db.insert(users).values({
 			walletAddress: body.walletAddress,
 			alias: body.alias,
@@ -275,7 +287,14 @@ app.post('/api/users', zValidator('json', userSchema, (result, c) => {
 		}).returning().get();
 
 		return c.json(newUser, 201);
-	} catch (error) {
+	} catch (error: any) {
+		// FIX: Handle the unique constraint violation that fires when two concurrent
+		// registrations race past the old select-then-insert check. D1 surfaces this
+		// as a SQLITE_CONSTRAINT error. The previous select was a TOCTOU race and is
+		// removed entirely — the DB constraint is the authoritative guard.
+		if (error?.message?.includes('UNIQUE constraint failed')) {
+			return c.json({ error: 'USER_ALREADY_EXISTS' }, 409);
+		}
 		console.error('Registration Error:', error);
 		return c.json({ error: 'REGISTRATION_FAILED' }, 500);
 	}
@@ -321,7 +340,7 @@ app.get('/api/projects/:id', async (c) => {
 
 app.post('/api/projects', zValidator('json', projectSchema, (result, c) => {
 	if (!result.success) {
-		return c.json({ error: 'VALIDATION_FAILED', details: result.error.type }, 400);
+		return c.json({ error: 'VALIDATION_FAILED', details: result.error.issues }, 400);
 	}
 }), async (c) => {
 	const body = c.req.valid('json');
@@ -332,11 +351,6 @@ app.post('/api/projects', zValidator('json', projectSchema, (result, c) => {
 	const db = drizzle(c.env.DB);
 
 	try {
-		const existing = await db.select().from(projects).where(eq(projects.id, body.id)).get();
-		if (existing) {
-			return c.json({ error: 'PROJECT_ALREADY_EXISTS' }, 409);
-		}
-
 		const newProject = await db.insert(projects).values({
 			id: body.id,
 			creatorWallet: body.creatorWallet,
@@ -349,54 +363,20 @@ app.post('/api/projects', zValidator('json', projectSchema, (result, c) => {
 		}).returning().get();
 
 		return c.json(newProject, 201);
-	} catch (error) {
+	} catch (error: any) {
+		if (error?.message?.includes('UNIQUE constraint failed')) {
+			return c.json({ error: 'PROJECT_ALREADY_EXISTS' }, 409);
+		}
 		console.error('Create project error:', error);
 		return c.json({ error: 'CREATE_PROJECT_FAILED' }, 500);
 	}
 });
 
-app.post('/api/milestones', zValidator('json', milestoneSchema, (result, c) => {
-	if (!result.success) {
-		return c.json({ error: 'VALIDATION_FAILED', details: result.error.type }, 400);
-	}
-}), async (c) => {
-	const body = c.req.valid('json');
-
-	const auth = authenticateRequest(body.creatorWallet, body.signature, body.message);
-	if (!auth.ok) return c.json({ error: auth.error }, 401);
-
-	const db = drizzle(c.env.DB);
-
-	try {
-		const parentProject = await db.select().from(projects).where(eq(projects.id, body.projectId)).get();
-		if (!parentProject) {
-			return c.json({ error: 'PARENT_PROJECT_NOT_FOUND' }, 404);
-		}
-
-		const existing = await db.select().from(milestones).where(eq(milestones.id, body.id)).get();
-		if (existing) {
-			return c.json({ error: 'MILESTONE_ALREADY_EXISTS' }, 409);
-		}
-
-		const newMilestone = await db.insert(milestones).values({
-			id: body.id,
-			projectId: body.projectId,
-			milestoneIndex: body.milestoneIndex,
-			title: body.title,
-			description: body.description,
-			updatedAt: new Date(),
-		}).returning().get();
-
-		return c.json(newMilestone, 201);
-	} catch (error) {
-		console.error('Create milestone error:', error);
-		return c.json({ error: 'CREATE_MILESTONE_FAILED' }, 500);
-	}
-});
-
+// FIX: batch route is registered BEFORE the :id route so Hono doesn't swallow
+// POST /api/projects/batch by treating "batch" as a project ID.
 app.post('/api/projects/batch', zValidator('json', batchProjectSchema, (result, c) => {
 	if (!result.success) {
-		return c.json({ error: 'VALIDATION_FAILED', details: result.error.type }, 400);
+		return c.json({ error: 'VALIDATION_FAILED', details: result.error.issues }, 400);
 	}
 }), async (c) => {
 	const { projectIds } = c.req.valid('json');
@@ -421,13 +401,60 @@ app.post('/api/projects/batch', zValidator('json', batchProjectSchema, (result, 
 			})
 			.from(projects)
 			.leftJoin(users, eq(projects.creatorWallet, users.walletAddress))
-			.where(inArray(projects.id, projectIds)) 
+			.where(inArray(projects.id, projectIds))
 			.all();
 
 		return c.json(activeProjects, 200);
 	} catch (error) {
 		console.error('Batch fetch error:', error);
 		return c.json({ error: 'INTERNAL_SERVER_ERROR' }, 500);
+	}
+});
+
+app.post('/api/milestones', zValidator('json', milestoneSchema, (result, c) => {
+	if (!result.success) {
+		return c.json({ error: 'VALIDATION_FAILED', details: result.error.issues }, 400);
+	}
+}), async (c) => {
+	const body = c.req.valid('json');
+
+	const auth = authenticateRequest(body.creatorWallet, body.signature, body.message);
+	if (!auth.ok) return c.json({ error: auth.error }, 401);
+
+	const db = drizzle(c.env.DB);
+
+	try {
+		const parentProject = await db
+			.select({ creatorWallet: projects.creatorWallet })
+			.from(projects)
+			.where(eq(projects.id, body.projectId))
+			.get();
+
+		if (!parentProject) {
+			return c.json({ error: 'PARENT_PROJECT_NOT_FOUND' }, 404);
+		}
+
+		// FIX: Verify the caller owns the project before attaching a milestone.
+		if (parentProject.creatorWallet !== body.creatorWallet) {
+			return c.json({ error: 'UNAUTHORIZED' }, 403);
+		}
+
+		const newMilestone = await db.insert(milestones).values({
+			id: body.id,
+			projectId: body.projectId,
+			milestoneIndex: body.milestoneIndex,
+			title: body.title,
+			description: body.description,
+			updatedAt: new Date(),
+		}).returning().get();
+
+		return c.json(newMilestone, 201);
+	} catch (error: any) {
+		if (error?.message?.includes('UNIQUE constraint failed')) {
+			return c.json({ error: 'MILESTONE_ALREADY_EXISTS' }, 409);
+		}
+		console.error('Create milestone error:', error);
+		return c.json({ error: 'CREATE_MILESTONE_FAILED' }, 500);
 	}
 });
 
