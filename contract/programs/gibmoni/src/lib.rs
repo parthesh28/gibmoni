@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 mod instructions;
 mod state;
 mod errors;
+mod helpers;
 
 use instructions::*;
 use state::MilestoneType;
@@ -18,10 +19,10 @@ pub mod gibmoni {
         Ok(())
     }
 
-    pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {
-        ctx.accounts.initialize_user(ctx.bumps)?;
-        Ok(())
-    }
+    // pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {
+    //     ctx.accounts.initialize_user(ctx.bumps)?;
+    //     Ok(())
+    // }
     
     pub fn create_project(ctx: Context<CreateProject>, args: CreateProjectArgs, task_id: u16) -> Result<()> {
         ctx.accounts.create_project(args, task_id, ctx.bumps)?;

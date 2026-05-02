@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 pub enum Error {
     #[msg("Amount cannot be zero.")]
     ZeroAmount,
-    
+
     #[msg("Project is invalid")]
     InvalidProject,
 
@@ -49,7 +49,7 @@ pub enum Error {
 
     #[msg("Invalid milestone count.")]
     InvalidMilestoneCount,
-    
+
     #[msg("Vote has been already casted.")]
     AlreadyVoted,
 
@@ -64,4 +64,26 @@ pub enum Error {
 
     #[msg("Milestones must be created in the correct chronological order.")]
     InvalidMilestoneOrder,
+
+    #[msg("Error while processing the signature.")]
+    ScoreTimestampExpired,
+
+    #[msg("Instruction at index 0 is not the Ed25519 program")]
+    InvalidEd25519Program,
+
+    #[msg("Ed25519 instruction data is too short")]
+    InvalidEd25519DataLength,
+
+    #[msg("Ed25519 instruction must contain exactly one signature")]
+    InvalidNumSignatures,
+
+    #[msg("The Oracle Public Key does not match the Ed25519 instruction")]
+    OraclePubkeyMismatch,
+
+    #[msg("The reconstructed message does not match the Ed25519 instruction")]
+    OracleMessageMismatch,
+    
+    #[msg("The Oracle Signature does not match the Ed25519 instruction")]
+    OracleSignatureMismatch,
+
 }
