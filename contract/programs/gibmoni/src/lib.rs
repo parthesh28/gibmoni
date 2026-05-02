@@ -21,12 +21,20 @@ pub mod gibmoni {
 
     pub fn initialize_user(
         ctx: Context<InitializeUser>,
+        ix_index: u8,
         wallet_score: u16,
         github_score: u16,
         score_timestamp: i64,
         oracle_signature: [u8; 64],
     ) -> Result<()> {
-        ctx.accounts.initialize_user(wallet_score, github_score, score_timestamp, oracle_signature, ctx.bumps)?;
+        ctx.accounts.initialize_user(
+            ix_index,
+            wallet_score,
+            github_score,
+            score_timestamp,
+            oracle_signature,
+            ctx.bumps,
+        )?;
         Ok(())
     }
 

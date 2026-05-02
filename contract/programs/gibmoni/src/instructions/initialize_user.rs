@@ -2,8 +2,8 @@ use anchor_lang::{prelude::*, solana_program};
 
 use crate::{
     errors::Error,
-    helpers::{ORACLE_PUBKEY, verify_ed25519_ix},
-    state::{USER_SEED, User},
+    helpers::{verify_ed25519_ix, ORACLE_PUBKEY},
+    state::{User, USER_SEED},
 };
 
 #[derive(Accounts)]
@@ -20,7 +20,7 @@ pub struct InitializeUser<'info> {
     )]
     pub user_account: Account<'info, User>,
 
-    /// CHECK: Instructions sysvar account
+    /// CHECK: Instructions sysvar account, verified against the canonical sysvar ID.
     #[account(address = solana_program::sysvar::instructions::ID)]
     pub instructions_sysvar: AccountInfo<'info>,
 
@@ -30,18 +30,18 @@ pub struct InitializeUser<'info> {
 impl<'info> InitializeUser<'info> {
     pub fn initialize_user(
         &mut self,
+        ix_index: u8,
         wallet_score: u16,
         github_score: u16,
         score_timestamp: i64,
         oracle_signature: [u8; 64],
         bumps: InitializeUserBumps,
     ) -> Result<()> {
-        let clock = Clock::get()?;
-        let time_diff = clock.unix_timestamp.checked_sub(score_timestamp).unwrap();
-        require!(
-            time_diff >= 0 && time_diff <= 300,
-            Error::ScoreTimestampExpired
-        );
+        let now = Clock::get()?.unix_timestamp;
+
+        let time_diff = now.saturating_sub(score_timestamp).abs();
+
+        require!(time_diff <= 300, Error::ScoreTimestampExpired);
 
         let wallet_key = self.user.key();
         let message = format!(
@@ -49,9 +49,15 @@ impl<'info> InitializeUser<'info> {
             wallet_key, wallet_score, github_score, score_timestamp
         );
 
+        let oracle_pubkey_bytes: &[u8; 32] = ORACLE_PUBKEY
+            .as_ref()
+            .try_into()
+            .map_err(|_| Error::OraclePubkeyMismatch)?;
+
         verify_ed25519_ix(
             &self.instructions_sysvar,
-            &ORACLE_PUBKEY.as_ref(),
+            ix_index,
+            oracle_pubkey_bytes,
             message.as_bytes(),
             &oracle_signature,
         )?;
@@ -62,8 +68,8 @@ impl<'info> InitializeUser<'info> {
             projects_posted: 0,
             milestones_succeeded: 0,
             projects_succeeded: 0,
-            time_joined: Clock::get()?.unix_timestamp,
-            last_active_time: Clock::get()?.unix_timestamp,
+            time_joined: now,
+            last_active_time: now,
             initial_github_score: github_score,
             initial_wallet_score: wallet_score,
             reputation: 0,

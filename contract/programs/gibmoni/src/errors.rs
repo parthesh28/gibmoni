@@ -73,6 +73,9 @@ pub enum Error {
 
     #[msg("Ed25519 instruction data is too short")]
     InvalidEd25519DataLength,
+    
+    #[msg("Ed25519 instruction index is incorrect")]
+    InvalidEd25519IxIndex ,
 
     #[msg("Ed25519 instruction must contain exactly one signature")]
     InvalidNumSignatures,
