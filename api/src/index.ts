@@ -10,6 +10,7 @@ import { users, projects, milestones } from './schema';
 
 export type Env = {
 	DB: D1Database;
+	ORACLE_PRIVATE_KEY: string;
 };
 
 const app = new Hono<{ Bindings: Env }>();
@@ -38,6 +39,79 @@ function authenticateRequest(walletAddress: string, signatureBase58: string, mes
 		return { ok: true };
 	} catch (e) {
 		return { ok: false, error: 'MALFORMED_AUTH_PAYLOAD' };
+	}
+}
+
+function signScoreAttestation(
+	walletAddress: string,
+	walletScore: number,
+	githubScore: number,
+	timestamp: number,
+	privateKeyBase58: string
+): string {
+	const messageString = `gibmoni-scores:${walletAddress}:${walletScore}:${githubScore}:${timestamp}`;
+	const messageBytes = new TextEncoder().encode(messageString);
+	const secretKey = bs58.decode(privateKeyBase58);
+	const signatureBytes = nacl.sign.detached(messageBytes, secretKey);
+
+	return bs58.encode(signatureBytes);
+}
+
+async function calculateWalletScore(walletAddress: string): Promise<number> {
+	try {
+		const rpcUrl = 'https://api.mainnet-beta.solana.com';
+		const response = await fetch(rpcUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				jsonrpc: "2.0", id: 1,
+				method: "getBalance",
+				params: [walletAddress]
+			})
+		});
+
+		const data: any = await response.json();
+		const lamports = data?.result?.value || 0;
+		const sol = lamports / 1_000_000_000;
+
+		const score = Math.min(Math.floor((sol / 5) * 1000), 1000);
+		return score;
+	} catch (e) {
+		console.error("Wallet scoring failed:", e);
+		return 0; 
+	}
+}
+
+async function calculateGithubScore(githubUrl: string | undefined): Promise<number> {
+	if (!githubUrl) return 0;
+
+	try {
+		const match = githubUrl.match(/github\.com\/([^/]+)/);
+		if (!match) return 0;
+		const username = match[1];
+
+		const res = await fetch(`https://api.github.com/users/${username}`, {
+			headers: { 'User-Agent': 'Gibmoni-Oracle-Server' }
+		});
+
+		if (!res.ok) return 0;
+		const data: any = await res.json();
+
+		let score = 0;
+
+		const createdYear = new Date(data.created_at).getFullYear();
+		const currentYear = new Date().getFullYear();
+		const ageYears = Math.max(currentYear - createdYear, 0);
+		score += Math.min(ageYears * 100, 400);
+
+		score += Math.min((data.public_repos || 0) * 20, 400);
+
+		score += Math.min((data.followers || 0) * 4, 200);
+
+		return Math.min(score, 1000);
+	} catch (e) {
+		console.error("GitHub scoring failed:", e);
+		return 0; // Graceful fallback
 	}
 }
 
@@ -78,6 +152,10 @@ const milestoneSchema = z.object({
 	description: z.string().min(1).max(2000),
 	signature: z.string().min(1), 
 	message: z.string().min(1), 
+});
+
+const batchProjectSchema = z.object({
+	projectIds: z.array(z.string().min(32).max(44)).max(100), // Max 100 at a time for safety
 });
 
 app.get('/', (c) => c.text('GIBMONI API // SYSTEM ONLINE'));
@@ -126,6 +204,48 @@ app.get('/api/users/:wallet', async (c) => {
 	}
 });
 
+app.get('/api/auth/onboarding-scores', async (c) => {
+	const wallet = c.req.query('wallet');
+	const githubUrl = c.req.query('githubUrl'); 
+
+	if (!wallet || wallet.length < 32 || wallet.length > 44) {
+		return c.json({ error: 'INVALID_WALLET_FORMAT' }, 400);
+	}
+
+	const privateKey = c.env.ORACLE_PRIVATE_KEY;
+	if (!privateKey) {
+		console.error("CRITICAL ERROR: ORACLE_PRIVATE_KEY is missing from environment variables.");
+		return c.json({ error: 'INTERNAL_SERVER_ERROR' }, 500);
+	}
+
+	try {
+		const [walletScore, githubScore] = await Promise.all([
+			calculateWalletScore(wallet),
+			calculateGithubScore(githubUrl)
+		]);
+
+		const timestamp = Date.now();
+		const oracleSignature = signScoreAttestation(
+			wallet,
+			walletScore,
+			githubScore,
+			timestamp,
+			privateKey
+		);
+
+		return c.json({
+			walletScore,
+			githubScore,
+			timestamp,
+			oracleSignature
+		}, 200);
+
+	} catch (error) {
+		console.error('Scoring/Signing Error:', error);
+		return c.json({ error: 'FAILED_TO_GENERATE_SCORES' }, 500);
+	}
+});
+
 app.post('/api/users', zValidator('json', userSchema, (result, c) => {
 	if (!result.success) {
 		return c.json({ error: 'VALIDATION_FAILED', details: result.error.type }, 400);
@@ -158,32 +278,6 @@ app.post('/api/users', zValidator('json', userSchema, (result, c) => {
 	} catch (error) {
 		console.error('Registration Error:', error);
 		return c.json({ error: 'REGISTRATION_FAILED' }, 500);
-	}
-});
-
-app.get('/api/projects', async (c) => {
-	try {
-		const db = drizzle(c.env.DB);
-		const allProjects = await db
-			.select({
-				id: projects.id,
-				creatorWallet: projects.creatorWallet,
-				title: projects.title,
-				tagline: projects.tagline,
-				description: projects.description,
-				coverImageUrl: projects.coverImageUrl,
-				category: projects.category,
-				createdAt: projects.createdAt,
-				creatorAlias: users.alias,
-			})
-			.from(projects)
-			.leftJoin(users, eq(projects.creatorWallet, users.walletAddress))
-			.all();
-
-		return c.json(allProjects, 200);
-	} catch (error) {
-		console.error('Fetch projects error:', error);
-		return c.json({ error: 'INTERNAL_SERVER_ERROR' }, 500);
 	}
 });
 
@@ -299,4 +393,42 @@ app.post('/api/milestones', zValidator('json', milestoneSchema, (result, c) => {
 		return c.json({ error: 'CREATE_MILESTONE_FAILED' }, 500);
 	}
 });
+
+app.post('/api/projects/batch', zValidator('json', batchProjectSchema, (result, c) => {
+	if (!result.success) {
+		return c.json({ error: 'VALIDATION_FAILED', details: result.error.type }, 400);
+	}
+}), async (c) => {
+	const { projectIds } = c.req.valid('json');
+
+	if (projectIds.length === 0) {
+		return c.json([], 200);
+	}
+
+	try {
+		const db = drizzle(c.env.DB);
+		const activeProjects = await db
+			.select({
+				id: projects.id,
+				creatorWallet: projects.creatorWallet,
+				title: projects.title,
+				tagline: projects.tagline,
+				description: projects.description,
+				coverImageUrl: projects.coverImageUrl,
+				category: projects.category,
+				createdAt: projects.createdAt,
+				creatorAlias: users.alias,
+			})
+			.from(projects)
+			.leftJoin(users, eq(projects.creatorWallet, users.walletAddress))
+			.where(inArray(projects.id, projectIds)) 
+			.all();
+
+		return c.json(activeProjects, 200);
+	} catch (error) {
+		console.error('Batch fetch error:', error);
+		return c.json({ error: 'INTERNAL_SERVER_ERROR' }, 500);
+	}
+});
+
 export default app;
