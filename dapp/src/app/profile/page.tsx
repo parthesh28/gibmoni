@@ -39,7 +39,6 @@ export default function ProfilePage() {
     const [createdProjects, setCreatedProjects] = useState<CreatedProject[]>([]);
     const [loading, setLoading] = useState(true);
     const [fetched, setFetched] = useState(false);
-    const [initPdaLoading, setInitPdaLoading] = useState(false);
 
     // Stabilize programId to avoid infinite re-renders
     const programId = program.programId.toBase58();
@@ -78,18 +77,9 @@ export default function ProfilePage() {
         fetchOffChainData();
     }, [connected, publicKey, fetchOffChainData]);
 
-    // Handle initialize user PDA
-    const handleInitPda = async () => {
-        setInitPdaLoading(true);
-        try {
-            await initializeUser.mutateAsync();
-            // Refetch the user account query
-            getUserAccount.refetch();
-        } catch (err) {
-            console.error('Init PDA error:', err);
-        } finally {
-            setInitPdaLoading(false);
-        }
+    // Handle initialize user PDA — redirect to full onboarding flow
+    const handleInitPda = () => {
+        window.location.href = '/onboarding';
     };
 
     // Derived on-chain data from the reactive query
@@ -153,12 +143,10 @@ export default function ProfilePage() {
             <div className="max-w-5xl mx-auto">
                 {/* Header */}
                 <div className="mb-10">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Terminal className="w-5 h-5 text-[#ea580c]" />
+                    <div className="mb-6">
                         <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-zinc-400 dark:text-zinc-500">
                             PROFILE.SYS // {publicKey.toBase58().slice(0, 6)}...{publicKey.toBase58().slice(-4)}
                         </span>
-                        <div className="w-2 h-2 bg-[#ea580c] animate-pulse"></div>
                     </div>
                 </div>
 
@@ -172,21 +160,13 @@ export default function ProfilePage() {
                                     On-Chain Profile Not Found
                                 </h3>
                                 <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400 leading-relaxed mb-6">
-                                    Your wallet is connected but no User PDA was found on-chain. Initialize your on-chain profile to start creating projects, funding, and voting.
+                                    Your wallet is connected but no User PDA was found on-chain. Complete the onboarding process to create your on-chain profile and start using the platform.
                                 </p>
                                 <button
                                     onClick={handleInitPda}
-                                    disabled={initPdaLoading}
-                                    className="flex items-center gap-2 px-6 py-3.5 bg-[#ea580c] text-white text-[10px] font-mono tracking-widest uppercase hover:bg-[#c2410c] transition-colors disabled:opacity-50"
+                                    className="px-6 py-3.5 bg-[#ea580c] text-white text-[10px] font-mono tracking-widest uppercase hover:bg-[#c2410c] transition-colors"
                                 >
-                                    {initPdaLoading ? (
-                                        <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            SIGNING TX...
-                                        </>
-                                    ) : (
-                                        '[ INITIALIZE ON-CHAIN PROFILE ]'
-                                    )}
+                                    [ GO TO ONBOARDING ]
                                 </button>
                             </div>
                         </div>

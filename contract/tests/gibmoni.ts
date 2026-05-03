@@ -1,9 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Gibmoni } from "../target/types/gibmoni";
-import { PublicKey, Keypair, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, Keypair, SystemProgram, LAMPORTS_PER_SOL, SYSVAR_INSTRUCTIONS_PUBKEY, Ed25519Program } from "@solana/web3.js";
 import { assert } from "chai";
 import fs from "fs";
+import nacl from "tweetnacl";
 import { init, taskKey, taskQueueAuthorityKey } from "@helium/tuktuk-sdk";
 
 const Logger = {
@@ -37,22 +38,35 @@ describe("Capstone Crowdfunding & Governance", () => {
   ];
 
   const getVaultPda = () => PublicKey.findProgramAddressSync([Buffer.from("VAULT")], program.programId);
+  const getTreasuryPda = () => PublicKey.findProgramAddressSync([Buffer.from("TREASURY")], program.programId);
   const getUserPda = (wallet: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("USER"), wallet.toBuffer()], program.programId);
   const getProjectPda = (name: string, authority: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("PROJECT"), Buffer.from(name), authority.toBuffer()], program.programId);
   const getContributionPda = (funder: PublicKey, project: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("CONTRIBUTION"), funder.toBuffer(), project.toBuffer()], program.programId);
   const getMilestonePda = (authority: PublicKey, project: PublicKey, typeIndex: number) => PublicKey.findProgramAddressSync([Buffer.from("MILESTONE"), authority.toBuffer(), project.toBuffer(), Buffer.from([typeIndex])], program.programId);
   const getVotePda = (milestone: PublicKey, voter: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("VOTE"), milestone.toBuffer(), voter.toBuffer()], program.programId);
 
+  // Oracle keypair for signing score attestations in tests
+  const oracleKeypair = loadWallet("./wallets/admin.json"); // Use the same key as ORACLE_PUBKEY in the contract
+  const ORACLE_PUBKEY = new PublicKey("AYoKgU74nVcwYQjP3CMqw5oMHMjdUNXyqPaW5eXRr57y");
+
+  function signScoreAttestation(wallet: PublicKey, walletScore: number, githubScore: number, timestamp: number): Uint8Array {
+    const message = `gibmoni-scores:${wallet.toBase58()}:${walletScore}:${githubScore}:${timestamp}`;
+    const messageBytes = new TextEncoder().encode(message);
+    const oracleSecret = oracleKeypair.secretKey;
+    return nacl.sign.detached(messageBytes, oracleSecret);
+  }
+
   const projectName1 = "MyTestProject1";
   const projectName2 = "MyTestProject2";
 
   let vaultPda: PublicKey, vaultBump: number;
+  let treasuryPda: PublicKey;
   let userPda: PublicKey, userBump: number;
   let project1Pda: PublicKey, project2Pda: PublicKey;
 
   let tuktukProgram: any;
   let taskId = getRandomId();
-  const taskQueue = new anchor.web3.PublicKey("GnCH4xcCtPTqiHa3z76dPW4DX7toa6qCntNJVtwS5KZc");
+  const taskQueue = new anchor.web3.PublicKey("S5GBDtkKpqsMDhfKCGtQx4gspZLwSJw23nnPKGuwMF5");
   const queueAuthority = PublicKey.findProgramAddressSync([Buffer.from("queue_authority")], program.programId)[0];
   const taskQueueAuthority = taskQueueAuthorityKey(taskQueue, queueAuthority)[0];
 
@@ -71,6 +85,7 @@ describe("Capstone Crowdfunding & Governance", () => {
     Logger.info("Queue Authority", queueAuthority.toBase58());
 
     [vaultPda, vaultBump] = getVaultPda();
+    [treasuryPda] = getTreasuryPda();
     [userPda, userBump] = getUserPda(user.publicKey);
     [project1Pda] = getProjectPda(projectName1, user.publicKey);
     [project2Pda] = getProjectPda(projectName2, user.publicKey);
@@ -119,7 +134,8 @@ describe("Capstone Crowdfunding & Governance", () => {
 
     await program.methods.createMilestone(typeObj, taskId)
       .accountsStrict({
-        milestoneAuthority: user.publicKey, milestone: mPda, vault: vaultPda, project: project2Pda, user: userPda,
+        milestoneAuthority: user.publicKey, milestone: mPda, vault: vaultPda, treasury: treasuryPda,
+        project: project2Pda, user: userPda,
         taskQueue, taskQueueAuthority, task: taskKey(taskQueue, taskId)[0], queueAuthority,
         systemProgram: SystemProgram.programId, tuktukProgram: tuktukProgram.programId,
       }).signers([user]).rpc({ skipPreflight: true });
@@ -136,7 +152,7 @@ describe("Capstone Crowdfunding & Governance", () => {
 
   it("Initializes the Platform Vault", async () => {
     await program.methods.initialize()
-      .accountsStrict({ admin: admin.publicKey, vault: vaultPda, systemProgram: SystemProgram.programId })
+      .accountsStrict({ admin: admin.publicKey, vault: vaultPda, treasury: treasuryPda, systemProgram: SystemProgram.programId })
       .signers([admin]).rpc();
 
     const vaultAccount = await program.account.vault.fetch(vaultPda);
@@ -150,9 +166,33 @@ describe("Capstone Crowdfunding & Governance", () => {
   xit("Initializes Developer and Contributor Profiles", async () => {
     Logger.header("Profile Initialization");
 
-    await program.methods.initializeUser()
-      .accountsStrict({ user: user.publicKey, userAccount: userPda, systemProgram: SystemProgram.programId })
-      .signers([user]).rpc();
+    // Helper to initialize a user with Ed25519 verified scores
+    async function initUser(wallet: Keypair, userAccountPda: PublicKey) {
+      const walletScore = 50;
+      const githubScore = 50;
+      const timestamp = Math.floor(Date.now() / 1000);
+      const message = `gibmoni-scores:${wallet.publicKey.toBase58()}:${walletScore}:${githubScore}:${timestamp}`;
+      const messageBytes = new TextEncoder().encode(message);
+      const signature = signScoreAttestation(wallet.publicKey, walletScore, githubScore, timestamp);
+
+      const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
+        publicKey: ORACLE_PUBKEY.toBytes(),
+        message: messageBytes,
+        signature,
+      });
+
+      await program.methods.initializeUser(0, walletScore, githubScore, new anchor.BN(timestamp), Array.from(signature) as any)
+        .accountsStrict({
+          user: wallet.publicKey,
+          userAccount: userAccountPda,
+          instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+          systemProgram: SystemProgram.programId,
+        })
+        .preInstructions([ed25519Ix])
+        .signers([wallet]).rpc();
+    }
+
+    await initUser(user, userPda);
 
     const userAccount = await program.account.user.fetch(userPda);
     Logger.step("Developer Profile Created");
@@ -160,9 +200,7 @@ describe("Capstone Crowdfunding & Governance", () => {
     Logger.info("Joined", new Date(userAccount.timeJoined.toNumber() * 1000).toLocaleString());
 
     for (const c of contributors) {
-      await program.methods.initializeUser()
-        .accountsStrict({ user: c.key.publicKey, userAccount: c.cPda, systemProgram: SystemProgram.programId })
-        .signers([c.key]).rpc();
+      await initUser(c.key, c.cPda);
     }
 
     const fetches = await Promise.all(contributors.map(c => program.account.user.fetch(c.cPda)));
@@ -228,7 +266,8 @@ describe("Capstone Crowdfunding & Governance", () => {
 
     await program.methods.createMilestone({ design: {} }, taskId)
       .accountsStrict({
-        milestoneAuthority: user.publicKey, milestone: milestone1Pda, vault: vaultPda, project: project1Pda, user: userPda,
+        milestoneAuthority: user.publicKey, milestone: milestone1Pda, vault: vaultPda, treasury: treasuryPda,
+        project: project1Pda, user: userPda,
         taskQueue, taskQueueAuthority, task: taskKey(taskQueue, taskId)[0], queueAuthority,
         systemProgram: SystemProgram.programId, tuktukProgram: tuktukProgram.programId,
       }).signers([user]).rpc({ skipPreflight: true });
@@ -243,7 +282,8 @@ describe("Capstone Crowdfunding & Governance", () => {
         taskId = getRandomId();
         await program.methods.retryMilestone(taskId)
           .accountsStrict({
-            milestoneAuthority: user.publicKey, project: project1Pda, milestone: milestone1Pda, user: userPda, vault: vaultPda,
+            milestoneAuthority: user.publicKey, project: project1Pda, milestone: milestone1Pda, user: userPda,
+            vault: vaultPda, treasury: treasuryPda,
             taskQueue, taskQueueAuthority, task: taskKey(taskQueue, taskId)[0], queueAuthority,
             systemProgram: SystemProgram.programId, tuktukProgram: tuktukProgram.programId,
           }).signers([user]).rpc();

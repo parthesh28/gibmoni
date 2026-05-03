@@ -2,14 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, Plus } from 'lucide-react';
 
 export default function FloatingNav() {
     const pathname = usePathname();
 
     const navItems = [
-        { href: '/dashboard', label: 'Explore', icon: Compass },
-        { href: '/create', label: 'Create', icon: Plus },
+        { href: '/dashboard', label: 'Explore' },
+        { href: '/create', label: 'Create' },
     ];
 
     return (
@@ -23,13 +22,12 @@ export default function FloatingNav() {
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                className={`flex items-center gap-2 px-5 py-3 text-[10px] font-mono tracking-widest uppercase transition-all duration-200 ${
+                                className={`px-6 py-3 text-[10px] font-mono tracking-widest uppercase transition-all duration-200 ${
                                     isActive
                                         ? 'bg-[#ea580c] text-white'
                                         : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900/50'
                                 }`}
                             >
-                                <item.icon className="w-3.5 h-3.5" />
                                 {item.label}
                             </Link>
                         );
@@ -39,3 +37,4 @@ export default function FloatingNav() {
         </>
     );
 }
+

@@ -7,7 +7,8 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
     "@helium/tuktuk-sdk": "^0.0.10",
-    "axios": "^1.13.6"
+    "axios": "^1.13.6",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",

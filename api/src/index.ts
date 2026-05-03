@@ -11,6 +11,8 @@ import { users, projects, milestones } from './schema';
 export type Env = {
 	DB: D1Database;
 	ORACLE_PRIVATE_KEY: string;
+	GITHUB_CLIENT_ID: string;
+	GITHUB_CLIENT_SECRET: string;
 };
 
 const app = new Hono<{ Bindings: Env }>();
@@ -42,18 +44,89 @@ function authenticateRequest(walletAddress: string, signatureBase58: string, mes
 	}
 }
 
+/**
+ * Resolve the oracle secret key from the env. Supports both base58 strings
+ * and JSON-encoded byte arrays (e.g. "[42,104,...]").
+ */
+function getOracleSecretKey(raw: string): Uint8Array {
+	const trimmed = raw.trim();
+	if (trimmed.startsWith('[')) {
+		const arr: number[] = JSON.parse(trimmed);
+		return new Uint8Array(arr);
+	}
+	return bs58.decode(trimmed);
+}
+
 function signScoreAttestation(
 	walletAddress: string,
 	walletScore: number,
 	githubScore: number,
 	timestamp: number,
-	privateKeyBase58: string
+	privateKeyRaw: string
 ): string {
+	// IMPORTANT: timestamp must be in seconds to match the smart contract's
+	// format!("gibmoni-scores:{}:{}:{}:{}", wallet_key, wallet_score, github_score, score_timestamp)
+	// where score_timestamp is i64 unix seconds.
 	const messageString = `gibmoni-scores:${walletAddress}:${walletScore}:${githubScore}:${timestamp}`;
 	const messageBytes = new TextEncoder().encode(messageString);
-	const secretKey = bs58.decode(privateKeyBase58);
+	const secretKey = getOracleSecretKey(privateKeyRaw);
 	const signatureBytes = nacl.sign.detached(messageBytes, secretKey);
 	return bs58.encode(signatureBytes);
+}
+
+/**
+ * Sign a GitHub-verify token that proves a wallet completed OAuth with a
+ * specific GitHub username. This is a stateless alternative to a DB session.
+ */
+function signGithubVerifyToken(
+	walletAddress: string,
+	githubUsername: string,
+	timestamp: number,
+	privateKeyRaw: string
+): string {
+	const messageString = `github-verified:${walletAddress}:${githubUsername}:${timestamp}`;
+	const messageBytes = new TextEncoder().encode(messageString);
+	const secretKey = getOracleSecretKey(privateKeyRaw);
+	const signatureBytes = nacl.sign.detached(messageBytes, secretKey);
+	// Encode the full payload as: base58(signature)|timestamp|githubUsername
+	return `${bs58.encode(signatureBytes)}|${timestamp}|${githubUsername}`;
+}
+
+/**
+ * Verify a GitHub-verify token. Returns the GitHub username if valid,
+ * or null if expired / tampered.
+ */
+function verifyGithubVerifyToken(
+	token: string,
+	walletAddress: string,
+	privateKeyRaw: string
+): { githubUsername: string; timestamp: number } | null {
+	try {
+		const parts = token.split('|');
+		if (parts.length !== 3) return null;
+
+		const [sigBase58, tsStr, githubUsername] = parts;
+		const timestamp = parseInt(tsStr, 10);
+		if (isNaN(timestamp)) return null;
+
+		// 5-minute expiry
+		const fiveMinutes = 5 * 60 * 1000;
+		if (Math.abs(Date.now() - timestamp) > fiveMinutes) return null;
+
+		// Reconstruct and verify
+		const messageString = `github-verified:${walletAddress}:${githubUsername}:${timestamp}`;
+		const messageBytes = new TextEncoder().encode(messageString);
+		const signatureBytes = bs58.decode(sigBase58);
+		const secretKey = getOracleSecretKey(privateKeyRaw);
+		// Derive public key from secret key (last 32 bytes are public in nacl)
+		const publicKey = secretKey.slice(32);
+		const valid = nacl.sign.detached.verify(messageBytes, signatureBytes, publicKey);
+		if (!valid) return null;
+
+		return { githubUsername, timestamp };
+	} catch {
+		return null;
+	}
 }
 
 async function calculateWalletScore(walletAddress: string): Promise<number> {
@@ -203,54 +276,153 @@ app.get('/api/users/:wallet', async (c) => {
 	}
 });
 
-app.get('/api/auth/onboarding-scores', async (c) => {
-	const wallet = c.req.query('wallet');
+// ─── GitHub OAuth Callback ────────────────────────────────────────────────
+// Exchanges the temporary OAuth code for an access token (requires client
+// secret → must be server-side), fetches the GitHub profile, and returns a
+// signed verify token as stateless proof of GitHub ownership.
 
-	if (!wallet || wallet.length < 32 || wallet.length > 44) {
-		return c.json({ error: 'INVALID_WALLET_FORMAT' }, 400);
+const githubCallbackSchema = z.object({
+	code: z.string().min(1),
+	walletAddress: z.string().min(32).max(44),
+});
+
+app.post('/api/auth/github/callback', zValidator('json', githubCallbackSchema, (result, c) => {
+	if (!result.success) {
+		return c.json({ error: 'VALIDATION_FAILED', details: result.error.issues }, 400);
 	}
+}), async (c) => {
+	const { code, walletAddress } = c.req.valid('json');
 
+	const clientId = c.env.GITHUB_CLIENT_ID;
+	const clientSecret = c.env.GITHUB_CLIENT_SECRET;
 	const privateKey = c.env.ORACLE_PRIVATE_KEY;
-	if (!privateKey) {
-		console.error("CRITICAL ERROR: ORACLE_PRIVATE_KEY is missing from environment variables.");
+
+	if (!clientId || !clientSecret || !privateKey) {
+		console.error('CRITICAL: Missing GitHub OAuth or Oracle env vars.');
 		return c.json({ error: 'INTERNAL_SERVER_ERROR' }, 500);
 	}
 
-	const db = drizzle(c.env.DB);
+	try {
+		// Exchange code for access token
+		const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Accept': 'application/json',
+			},
+			body: JSON.stringify({
+				client_id: clientId,
+				client_secret: clientSecret,
+				code,
+			}),
+		});
 
-	// FIX: Look up the user's stored githubUrl rather than trusting the caller to
-	// pass it in — prevents gaming the score by supplying a different GitHub profile.
-	const existingUser = await db
-		.select({ githubUrl: users.githubUrl })
-		.from(users)
-		.where(eq(users.walletAddress, wallet))
-		.get();
+		const tokenData: any = await tokenRes.json();
 
-	const githubUrl = existingUser?.githubUrl ?? c.req.query('githubUrl');
+		if (tokenData.error || !tokenData.access_token) {
+			console.error('GitHub token exchange failed:', tokenData);
+			return c.json({ error: 'GITHUB_AUTH_FAILED', detail: tokenData.error_description || 'Code exchange failed' }, 400);
+		}
+
+		// Fetch GitHub user profile
+		const userRes = await fetch('https://api.github.com/user', {
+			headers: {
+				'Authorization': `Bearer ${tokenData.access_token}`,
+				'User-Agent': 'Gibmoni-Oracle-Server',
+				'Accept': 'application/vnd.github+json',
+			},
+		});
+
+		if (!userRes.ok) {
+			console.error('GitHub user fetch failed:', userRes.status);
+			return c.json({ error: 'GITHUB_PROFILE_FETCH_FAILED' }, 502);
+		}
+
+		const githubUser: any = await userRes.json();
+		const githubUsername = githubUser.login as string;
+		const githubAvatarUrl = githubUser.avatar_url as string;
+
+		// Sign a verify token (stateless proof of OAuth)
+		const timestamp = Date.now();
+		const verifyToken = signGithubVerifyToken(walletAddress, githubUsername, timestamp, privateKey);
+
+		return c.json({
+			githubUsername,
+			githubAvatarUrl,
+			verifyToken,
+		}, 200);
+
+	} catch (error) {
+		console.error('GitHub callback error:', error);
+		return c.json({ error: 'GITHUB_AUTH_FAILED' }, 500);
+	}
+});
+
+// ─── Onboarding Scores ───────────────────────────────────────────────────
+// Verifies wallet ownership (via signature) and GitHub ownership (via
+// oracle-signed verifyToken), then computes and attests both scores.
+
+const onboardingScoresSchema = z.object({
+	walletAddress: z.string().min(32).max(44),
+	signature: z.string().min(1),
+	message: z.string().min(1),
+	verifyToken: z.string().min(1),
+});
+
+app.post('/api/auth/onboarding-scores', zValidator('json', onboardingScoresSchema, (result, c) => {
+	if (!result.success) {
+		return c.json({ error: 'VALIDATION_FAILED', details: result.error.issues }, 400);
+	}
+}), async (c) => {
+	const { walletAddress, signature, message, verifyToken } = c.req.valid('json');
+
+	const privateKey = c.env.ORACLE_PRIVATE_KEY;
+	if (!privateKey) {
+		console.error('CRITICAL ERROR: ORACLE_PRIVATE_KEY is missing from environment variables.');
+		return c.json({ error: 'INTERNAL_SERVER_ERROR' }, 500);
+	}
+
+	// Step 1: Verify wallet ownership
+	const auth = authenticateRequest(walletAddress, signature, message);
+	if (!auth.ok) return c.json({ error: auth.error }, 401);
+
+	// Step 2: Verify GitHub ownership via oracle-signed token
+	const githubVerify = verifyGithubVerifyToken(verifyToken, walletAddress, privateKey);
+	if (!githubVerify) {
+		return c.json({ error: 'GITHUB_VERIFY_TOKEN_INVALID' }, 401);
+	}
+
+	const githubUrl = `https://github.com/${githubVerify.githubUsername}`;
 
 	try {
 		const [walletScore, githubScore] = await Promise.all([
-			calculateWalletScore(wallet),
-			calculateGithubScore(githubUrl ?? undefined),
+			calculateWalletScore(walletAddress),
+			calculateGithubScore(githubUrl),
 		]);
 
-		const timestamp = Date.now();
+		// Use unix seconds — the smart contract uses Clock::get().unix_timestamp (i64 seconds)
+		const timestamp = Math.floor(Date.now() / 1000);
 		const oracleSignature = signScoreAttestation(
-			wallet,
+			walletAddress,
 			walletScore,
 			githubScore,
 			timestamp,
 			privateKey
 		);
 
-		// FIX: Persist scores to the DB so the smart contract can read them back.
-		// Only update if the user already exists; new users get scores written at
-		// registration time.
+		// Persist scores if the user already exists in DB
+		const db = drizzle(c.env.DB);
+		const existingUser = await db
+			.select({ walletAddress: users.walletAddress })
+			.from(users)
+			.where(eq(users.walletAddress, walletAddress))
+			.get();
+
 		if (existingUser) {
 			await db
 				.update(users)
 				.set({ walletScore, githubScore })
-				.where(eq(users.walletAddress, wallet));
+				.where(eq(users.walletAddress, walletAddress));
 		}
 
 		return c.json({ walletScore, githubScore, timestamp, oracleSignature }, 200);

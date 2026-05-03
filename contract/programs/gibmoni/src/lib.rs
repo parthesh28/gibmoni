@@ -8,7 +8,7 @@ mod state;
 use instructions::*;
 use state::MilestoneType;
 
-declare_id!("7TNWhyi9pLp5dWQF1nHPoTNjosd5cCJQVqqPX3SHdXcP");
+declare_id!("9qmeNAZdQvMnrpj8mC6Yi8w9EoJPfzjD6ayYhrKpnquY");
 
 #[program]
 pub mod gibmoni {

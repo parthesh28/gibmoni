@@ -2,7 +2,7 @@
 
 import { getGibmoniProgram, getGibmoniProgramId } from '../context/anchorProvider'
 import { useConnection } from '@solana/wallet-adapter-react'
-import { Cluster, PublicKey, SystemProgram } from '@solana/web3.js'
+import { Cluster, PublicKey, SystemProgram, SYSVAR_INSTRUCTIONS_PUBKEY, Ed25519Program, TransactionInstruction } from '@solana/web3.js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { useCluster } from '../context/clusterProvider'
@@ -10,10 +10,14 @@ import { useAnchorProvider } from '../context/solanaProvider'
 import { useTransactionToast } from '../../components/transactionToast'
 import { toast } from 'sonner'
 import * as anchor from '@coral-xyz/anchor'
+import bs58 from 'bs58'
 
 // Browser-safe replacements for @helium/tuktuk-sdk PDA helpers
 // The originals use buf.writeUint16LE which doesn't exist in browser Buffer polyfills
 const TUKTUK_PROGRAM_ID = new PublicKey("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
+
+// Oracle public key — must match the one hardcoded in the smart contract
+const ORACLE_PUBKEY = new PublicKey("AYoKgU74nVcwYQjP3CMqw5oMHMjdUNXyqPaW5eXRr57y");
 
 function localTaskKey(taskQueue: PublicKey, taskId: number): [PublicKey, number] {
     const buf = Buffer.alloc(2);
@@ -32,6 +36,22 @@ function localTaskQueueAuthorityKey(taskQueue: PublicKey, authority: PublicKey):
     );
 }
 
+/**
+ * Build the Ed25519SigVerify instruction that the smart contract will
+ * cross-reference via the instructions sysvar.
+ */
+function buildEd25519VerifyInstruction(
+    oraclePubkey: PublicKey,
+    message: Uint8Array,
+    signature: Uint8Array,
+): TransactionInstruction {
+    return Ed25519Program.createInstructionWithPublicKey({
+        publicKey: oraclePubkey.toBytes(),
+        message,
+        signature,
+    });
+}
+
 export function useGibmoniProgram() {
     const { connection } = useConnection()
     const { cluster } = useCluster()
@@ -42,7 +62,7 @@ export function useGibmoniProgram() {
     const program = useMemo(() => getGibmoniProgram(provider, programId), [provider, programId])
 
     // Tuktuk Constants
-    const taskQueue = new PublicKey("GnCH4xcCtPTqiHa3z76dPW4DX7toa6qCntNJVtwS5KZc");
+    const taskQueue = new PublicKey("S5GBDtkKpqsMDhfKCGtQx4gspZLwSJw23nnPKGuwMF5");
 
     const refreshProjectsData = () => {
         queryClient.invalidateQueries({ queryKey: ['get-all-projects'] })
@@ -92,19 +112,58 @@ export function useGibmoniProgram() {
     };
 
     // 1. Initialize User Profile
+    // The smart contract expects: (ix_index, wallet_score, github_score, score_timestamp, oracle_signature)
+    // An Ed25519SigVerify instruction must be prepended at ix_index in the same tx.
     const initializeUser = useMutation({
         mutationKey: ['user', 'initializeUser', { cluster }],
-        mutationFn: () => {
+        mutationFn: async (data: {
+            walletScore: number,
+            githubScore: number,
+            scoreTimestamp: number,
+            oracleSignature: string, // base58-encoded oracle signature
+        }) => {
             const [userPda] = PublicKey.findProgramAddressSync(
                 [Buffer.from("USER"), provider.publicKey.toBuffer()],
                 program.programId
             );
 
-            return program.methods.initializeUser().accountsStrict({
-                user: provider.publicKey,
-                userAccount: userPda,
-                systemProgram: SystemProgram.programId,
-            }).rpc()
+            // Reconstruct the message the oracle signed
+            // Note: scoreTimestamp is already in unix seconds (matching the contract)
+            const messageString = `gibmoni-scores:${provider.publicKey.toBase58()}:${data.walletScore}:${data.githubScore}:${data.scoreTimestamp}`;
+            const messageBytes = new TextEncoder().encode(messageString);
+            const signatureBytes = bs58.decode(data.oracleSignature);
+
+            // Build the Ed25519 verify instruction (will be ix 0 in the tx)
+            const ed25519Ix = buildEd25519VerifyInstruction(
+                ORACLE_PUBKEY,
+                messageBytes,
+                signatureBytes,
+            );
+
+            // The Ed25519 verify instruction is at index 0, so ix_index = 0
+            const ixIndex = 0;
+
+            // Convert oracle signature to [u8; 64] array
+            const oracleSigArray = Array.from(signatureBytes);
+
+            const tx = await program.methods
+                .initializeUser(
+                    ixIndex,
+                    data.walletScore,
+                    data.githubScore,
+                    new anchor.BN(data.scoreTimestamp),
+                    oracleSigArray as any,
+                )
+                .accountsStrict({
+                    user: provider.publicKey,
+                    userAccount: userPda,
+                    instructionsSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+                    systemProgram: SystemProgram.programId,
+                })
+                .preInstructions([ed25519Ix])
+                .rpc();
+
+            return tx;
         },
         onSuccess: (signature) => {
             transactionToast(signature, {
@@ -139,7 +198,10 @@ export function useGibmoniProgram() {
                 program.programId
             );
 
-            const queueAuthority = new PublicKey("D7vF1s4o95EMr8XdCFh3BfrYK8EFTBnUYP8go6425fY3");
+            const [queueAuthority] = PublicKey.findProgramAddressSync(
+                [Buffer.from("queue_authority")],
+                program.programId
+            );
 
             const [taskQueueAuthority] = localTaskQueueAuthorityKey(taskQueue, queueAuthority);
             const [task] = localTaskKey(taskQueue, taskId);
@@ -242,6 +304,11 @@ export function useGibmoniProgram() {
                 program.programId
             );
 
+            const [treasuryPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("TREASURY")],
+                program.programId
+            );
+
             const [projectPda] = PublicKey.findProgramAddressSync(
                 [Buffer.from("PROJECT"), Buffer.from(data.projectName), provider.publicKey.toBuffer()],
                 program.programId
@@ -259,7 +326,10 @@ export function useGibmoniProgram() {
             );
 
             // Tuktuk task queue PDAs
-            const queueAuthority = new PublicKey("D7vF1s4o95EMr8XdCFh3BfrYK8EFTBnUYP8go6425fY3");
+            const [queueAuthority] = PublicKey.findProgramAddressSync(
+                [Buffer.from("queue_authority")],
+                program.programId
+            );
             const [taskQueueAuthority] = localTaskQueueAuthorityKey(taskQueue, queueAuthority);
             const [task] = localTaskKey(taskQueue, taskId);
 
@@ -267,13 +337,14 @@ export function useGibmoniProgram() {
                 milestoneAuthority: provider.publicKey,
                 milestone: milestonePda,
                 vault: vaultPda,
+                treasury: treasuryPda,
                 project: projectPda,
                 user: userPda,
                 taskQueue,
                 taskQueueAuthority,
                 task,
                 queueAuthority,
-                systemProgram: SystemProgram.programId,
+                systemProgram: SystemProgram.programId, 
                 tuktukProgram: TUKTUK_PROGRAM_ID
             }).rpc({ skipPreflight: true }) // You had skipPreflight in your tests, so I preserved it here
         },

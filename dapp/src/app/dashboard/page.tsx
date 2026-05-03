@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { Terminal, Loader2, Box, Users, Zap, Search, Filter, X } from 'lucide-react';
+import { Loader2, Box, Search, X } from 'lucide-react';
 import { useGibmoniProgram } from '../hooks/useAnchorQueries';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import FloatingNav from '@/components/floatingNav';
@@ -147,8 +147,7 @@ export default function DashboardPage() {
             {/* Header */}
             <div className="max-w-7xl mx-auto">
                 <div className="mb-12">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Terminal className="w-5 h-5 text-[#ea580c]" />
+                    <div className="mb-6">
                         <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-zinc-400 dark:text-zinc-500">
                             EXPLORE // ALL_NODES
                         </span>
@@ -182,10 +181,7 @@ export default function DashboardPage() {
                                 : 'bg-transparent text-zinc-500 dark:text-zinc-400 hover:text-[#ea580c]'
                         }`}
                     >
-                        <span className="flex items-center gap-1.5">
-                            <Zap className="w-3 h-3" />
-                            Funding ({mergedProjects.filter(p => p.state === 'Funding').length})
-                        </span>
+                        Funding ({mergedProjects.filter(p => p.state === 'Funding').length})
                     </button>
                 </div>
 
@@ -296,9 +292,8 @@ export default function DashboardPage() {
                                             <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
                                                 by <span className="text-zinc-700 dark:text-zinc-300">{project.creatorAlias}</span>
                                             </span>
-                                            <span className="flex items-center gap-1 text-[10px] font-mono text-zinc-400 dark:text-zinc-500">
-                                                <Users className="w-3 h-3" />
-                                                {project.funderCount}
+                                            <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500">
+                                                {project.funderCount} funders
                                             </span>
                                         </div>
                                         {!project.hasApiData && (
