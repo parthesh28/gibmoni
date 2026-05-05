@@ -364,6 +364,81 @@ export function useGibmoniProgram() {
         },
     })
 
+    const retryMilestone = useMutation({
+        mutationKey: ['milestone', 'retryMilestone', { cluster }],
+        mutationFn: async (data: {
+            projectName: string,
+            projectAuthority: PublicKey,
+            typeIndex: number,
+        }) => {
+            if (!program || !provider.publicKey) throw new Error("Wallet not connected");
+
+            const getRandomId = (): number => Math.floor(Math.random() * 1000) + 1;
+            const taskId = getRandomId();
+
+            const [projectPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("PROJECT"), Buffer.from(data.projectName), data.projectAuthority.toBuffer()],
+                program.programId
+            );
+
+            const [userPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("USER"), provider.publicKey.toBuffer()],
+                program.programId
+            );
+
+            const [vaultPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("VAULT")],
+                program.programId
+            );
+
+            const [treasuryPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("TREASURY")],
+                program.programId
+            );
+
+            const [milestonePda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("MILESTONE"), data.projectAuthority.toBuffer(), projectPda.toBuffer(), Buffer.from([data.typeIndex])],
+                program.programId
+            );
+
+            // Tuktuk task queue PDAs
+            const [queueAuthority] = PublicKey.findProgramAddressSync(
+                [Buffer.from("queue_authority")],
+                program.programId
+            );
+            const [taskQueueAuthority] = localTaskQueueAuthorityKey(taskQueue, queueAuthority);
+            const [task] = localTaskKey(taskQueue, taskId);
+
+            return program.methods.retryMilestone(taskId).accountsStrict({
+                milestoneAuthority: provider.publicKey,
+                project: projectPda,
+                milestone: milestonePda,
+                user: userPda,
+                vault: vaultPda,
+                treasury: treasuryPda,
+                taskQueue,
+                taskQueueAuthority,
+                task,
+                queueAuthority,
+                systemProgram: SystemProgram.programId, 
+                tuktukProgram: TUKTUK_PROGRAM_ID
+            }).rpc()
+        },
+        onSuccess: (signature) => {
+            transactionToast(signature, {
+                title: 'Milestone Retried!',
+                description: 'Your milestone is now back in voting.'
+            })
+            refreshProjectsData()
+        },
+        onError: (error) => {
+            console.error('Retry milestone error:', error)
+            toast.error('Failed to Retry Milestone', {
+                description: error.message || 'An unknown error occurred'
+            })
+        }
+    });
+
     // 5. Vote on a Milestone
     const voteOnMilestone = useMutation({
         mutationKey: ['milestone', 'vote', { cluster }],
@@ -424,6 +499,94 @@ export function useGibmoniProgram() {
         },
     })
 
+    // 6. Cancel Unfunded Project (permissionless — anyone can call after deadline)
+    const cancelUnfundedProject = useMutation({
+        mutationKey: ['project', 'cancelUnfunded', { cluster }],
+        mutationFn: async (data: {
+            projectName: string,
+            projectAuthority: PublicKey,
+        }) => {
+            if (!program || !provider.publicKey) throw new Error("Wallet not connected");
+
+            const [projectPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("PROJECT"), Buffer.from(data.projectName), data.projectAuthority.toBuffer()],
+                program.programId
+            );
+
+            return program.methods.cancelUnfundedProject().accountsStrict({
+                project: projectPda,
+            }).rpc()
+        },
+        onSuccess: (signature) => {
+            transactionToast(signature, {
+                title: 'Project Cancelled',
+                description: 'The unfunded project has been marked as failed.'
+            })
+            refreshProjectsData()
+        },
+        onError: (error) => {
+            console.error('Cancel unfunded project error:', error)
+            toast.error('Failed to Cancel Project', {
+                description: error.message || 'An unknown error occurred',
+                duration: 6000,
+            })
+        },
+    })
+
+    // 7. Claim Refund (for funders of failed projects)
+    const claimRefund = useMutation({
+        mutationKey: ['project', 'claimRefund', { cluster }],
+        mutationFn: async (data: {
+            projectName: string,
+            projectAuthority: PublicKey,
+        }) => {
+            if (!program || !provider.publicKey) throw new Error("Wallet not connected");
+
+            const [projectPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("PROJECT"), Buffer.from(data.projectName), data.projectAuthority.toBuffer()],
+                program.programId
+            );
+
+            const [vaultPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("VAULT")],
+                program.programId
+            );
+
+            const [userPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("USER"), provider.publicKey.toBuffer()],
+                program.programId
+            );
+
+            const [contributionPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("CONTRIBUTION"), provider.publicKey.toBuffer(), projectPda.toBuffer()],
+                program.programId
+            );
+
+            return program.methods.claimRefund().accountsStrict({
+                funder: provider.publicKey,
+                vault: vaultPda,
+                project: projectPda,
+                user: userPda,
+                contribution: contributionPda,
+                systemProgram: SystemProgram.programId,
+            }).rpc()
+        },
+        onSuccess: (signature) => {
+            transactionToast(signature, {
+                title: 'Refund Claimed! 💰',
+                description: 'Your proportional refund has been returned to your wallet.'
+            })
+            refreshProjectsData()
+        },
+        onError: (error) => {
+            console.error('Claim refund error:', error)
+            toast.error('Refund Failed', {
+                description: error.message || 'An unknown error occurred',
+                duration: 6000,
+            })
+        },
+    })
+
     return {
         provider,
         program,
@@ -436,6 +599,9 @@ export function useGibmoniProgram() {
         contributeFund,
         voteOnMilestone, 
         createMilestone,
+        retryMilestone,
+        cancelUnfundedProject,
+        claimRefund,
         checkHasVoted
     }
 }

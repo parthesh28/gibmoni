@@ -151,3 +151,17 @@
 .font-sans {
   font-family: var(--font-sans);
 }
+
+.bg-grid-pattern {
+  background-size: 100px 100px;
+  background-attachment: fixed;
+  background-image: 
+    linear-gradient(to right, oklch(0 0 0 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0 0 0 / 0.04) 1px, transparent 1px);
+}
+
+.dark .bg-grid-pattern {
+  background-image: 
+    linear-gradient(to right, oklch(1 0 0 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 0.04) 1px, transparent 1px);
+}

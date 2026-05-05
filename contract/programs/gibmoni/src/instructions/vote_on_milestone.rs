@@ -131,6 +131,8 @@ impl<'info> VoteOnMilestone<'info> {
         } else {
             decayed
         };
+        
+        self.user.reputation = reputation as u16;
 
         let raw_sqrt = integer_sqrt(self.contribution.amount);
         let base_power = raw_sqrt.checked_div(100).unwrap_or(0);

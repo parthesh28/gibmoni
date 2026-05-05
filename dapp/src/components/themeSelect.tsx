@@ -23,7 +23,7 @@ export function ThemeSelect() {
                     <Button
                         variant="outline"
                         size="icon"
-                        className="relative w-10 h-10 rounded-none border border-orange-500/20 dark:border-orange-100/30 bg-zinc-100 dark:bg-neutral-950 hover:bg-orange-500/10 dark:hover:bg-orange-100/10 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 group"
+                        className="relative w-10 h-10 rounded-none border border-zinc-300/60 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/95 hover:bg-[#ea580c]/5 hover:border-[#ea580c]/40 dark:hover:bg-[#ea580c]/5 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 group"
                     >
                         {/* Orange-tinted Icons */}
                         <Sun className="h-4 w-4 rotate-0 scale-100 transition-all duration-500 ease-in-out dark:-rotate-180 dark:scale-0 text-orange-600/80 dark:text-orange-100 group-hover:text-orange-600 dark:group-hover:text-orange-50" />
@@ -35,7 +35,7 @@ export function ThemeSelect() {
                 {/* Color-matched Dropdown Menu */}
                 <DropdownMenuContent
                     align="end"
-                    className="min-w-[140px] rounded-none border border-orange-500/20 dark:border-orange-100/30 bg-zinc-100 dark:bg-neutral-950 p-1 shadow-none"
+                    className="min-w-[140px] rounded-none border border-zinc-300/60 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 p-1 shadow-none"
                 >
                     <DropdownMenuItem
                         onClick={() => setTheme('light')}

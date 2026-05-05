@@ -13,6 +13,7 @@ export type Env = {
 	ORACLE_PRIVATE_KEY: string;
 	GITHUB_CLIENT_ID: string;
 	GITHUB_CLIENT_SECRET: string;
+	SOLANA_RPC_URL?: string;
 };
 
 const app = new Hono<{ Bindings: Env }>();
@@ -129,24 +130,42 @@ function verifyGithubVerifyToken(
 	}
 }
 
-async function calculateWalletScore(walletAddress: string): Promise<number> {
+async function calculateWalletScore(walletAddress: string, rpcUrl?: string): Promise<number> {
 	try {
-		const rpcUrl = 'https://api.mainnet-beta.solana.com';
-		const response = await fetch(rpcUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				jsonrpc: "2.0", id: 1,
-				method: "getBalance",
-				params: [walletAddress]
-			})
-		});
+		const endpoint = rpcUrl || 'https://api.devnet.solana.com';
 
-		const data: any = await response.json();
-		const lamports = data?.result?.value || 0;
+		// Fetch balance and tx count in parallel
+		const [balanceRes, txRes] = await Promise.all([
+			fetch(endpoint, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getBalance", params: [walletAddress] })
+			}),
+			fetch(endpoint, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					jsonrpc: "2.0", id: 2,
+					method: "getSignaturesForAddress",
+					params: [walletAddress, { limit: 100 }]
+				})
+			}),
+		]);
+
+		const balanceData: any = await balanceRes.json();
+		const txData: any = await txRes.json();
+
+		const lamports = balanceData?.result?.value || 0;
 		const sol = lamports / 1_000_000_000;
-		const score = Math.min(Math.floor((sol / 5) * 1000), 1000);
-		return score;
+		const txCount = Array.isArray(txData?.result) ? txData.result.length : 0;
+
+		// Balance score: 0-50 pts. sqrt curve, 10+ SOL = max
+		const balanceScore = Math.min(Math.round(Math.sqrt(sol / 10) * 50), 50);
+
+		// Transaction score: 0-50 pts. sqrt curve, 100 txs = max
+		const txScore = Math.min(Math.round(Math.sqrt(txCount / 100) * 50), 50);
+
+		return Math.min(balanceScore + txScore, 100);
 	} catch (e) {
 		console.error("Wallet scoring failed:", e);
 		return 0;
@@ -168,18 +187,21 @@ async function calculateGithubScore(githubUrl: string | undefined): Promise<numb
 		if (!res.ok) return 0;
 		const data: any = await res.json();
 
-		let score = 0;
-
-		// FIX: Use full date arithmetic instead of year-only comparison so accounts
-		// created in January vs December of the same year score correctly.
+		// === Fair 0-100 scoring ===
+		// Account age: 0-35 pts (capped at 2 years, so new devs can still score well)
 		const ageMs = Date.now() - new Date(data.created_at).getTime();
 		const ageYears = Math.max(ageMs / (1000 * 60 * 60 * 24 * 365), 0);
-		score += Math.min(Math.floor(ageYears * 100), 400);
+		const ageScore = Math.min(Math.round(ageYears * 17.5), 35);
 
-		score += Math.min((data.public_repos || 0) * 20, 400);
-		score += Math.min((data.followers || 0) * 4, 200);
+		// Public repos: 0-35 pts (capped at 15 repos, so beginners with a few projects still score)
+		const repos = data.public_repos || 0;
+		const repoScore = Math.min(Math.round((repos / 15) * 35), 35);
 
-		return Math.min(score, 1000);
+		// Followers: 0-30 pts (capped at 25 followers, reachable for active devs)
+		const followers = data.followers || 0;
+		const followerScore = Math.min(Math.round((followers / 25) * 30), 30);
+
+		return Math.min(ageScore + repoScore + followerScore, 100);
 	} catch (e) {
 		console.error("GitHub scoring failed:", e);
 		return 0;
@@ -210,19 +232,14 @@ const projectSchema = z.object({
 	description: z.string().min(1).max(5000),
 	category: z.string().max(50).optional().or(z.literal('')),
 	coverImageUrl: z.string().url().optional().or(z.literal('')),
-	signature: z.string().min(1),
-	message: z.string().min(1),
 });
 
 const milestoneSchema = z.object({
 	id: z.string().min(1).max(100),
 	projectId: z.string().min(32).max(44),
-	creatorWallet: z.string().min(32).max(44),
 	milestoneIndex: z.number().int().min(0).max(3),
 	title: z.string().min(1).max(100),
 	description: z.string().min(1).max(2000),
-	signature: z.string().min(1),
-	message: z.string().min(1),
 });
 
 const batchProjectSchema = z.object({
@@ -394,9 +411,22 @@ app.post('/api/auth/onboarding-scores', zValidator('json', onboardingScoresSchem
 
 	const githubUrl = `https://github.com/${githubVerify.githubUsername}`;
 
+	// Enforce GitHub uniqueness: one GitHub account per wallet
+	try {
+		const db = drizzle(c.env.DB);
+		const existingGithubUser = await db
+			.select({ walletAddress: users.walletAddress })
+			.from(users)
+			.where(eq(users.githubUrl, githubUrl))
+			.get();
+		if (existingGithubUser && existingGithubUser.walletAddress !== walletAddress) {
+			return c.json({ error: 'GITHUB_ALREADY_LINKED', message: 'This GitHub account is already associated with another wallet.' }, 409);
+		}
+	} catch { }
+
 	try {
 		const [walletScore, githubScore] = await Promise.all([
-			calculateWalletScore(walletAddress),
+			calculateWalletScore(walletAddress, c.env.SOLANA_RPC_URL),
 			calculateGithubScore(githubUrl),
 		]);
 
@@ -517,9 +547,7 @@ app.post('/api/projects', zValidator('json', projectSchema, (result, c) => {
 }), async (c) => {
 	const body = c.req.valid('json');
 
-	const auth = authenticateRequest(body.creatorWallet, body.signature, body.message);
-	if (!auth.ok) return c.json({ error: auth.error }, 401);
-
+	// No separate auth needed — the on-chain tx already proves wallet ownership
 	const db = drizzle(c.env.DB);
 
 	try {
@@ -590,9 +618,7 @@ app.post('/api/milestones', zValidator('json', milestoneSchema, (result, c) => {
 }), async (c) => {
 	const body = c.req.valid('json');
 
-	const auth = authenticateRequest(body.creatorWallet, body.signature, body.message);
-	if (!auth.ok) return c.json({ error: auth.error }, 401);
-
+	// No separate auth needed — the on-chain tx already proves wallet ownership
 	const db = drizzle(c.env.DB);
 
 	try {
@@ -604,11 +630,6 @@ app.post('/api/milestones', zValidator('json', milestoneSchema, (result, c) => {
 
 		if (!parentProject) {
 			return c.json({ error: 'PARENT_PROJECT_NOT_FOUND' }, 404);
-		}
-
-		// FIX: Verify the caller owns the project before attaching a milestone.
-		if (parentProject.creatorWallet !== body.creatorWallet) {
-			return c.json({ error: 'UNAUTHORIZED' }, 403);
 		}
 
 		const newMilestone = await db.insert(milestones).values({

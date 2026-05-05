@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { Loader2, Box, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
+import { BrutalistLoader } from '@/components/brutalistLoader';
 import { useGibmoniProgram } from '../hooks/useAnchorQueries';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import FloatingNav from '@/components/floatingNav';
@@ -141,7 +142,7 @@ export default function DashboardPage() {
     }, [mergedProjects, filter, searchQuery]);
 
     return (
-        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300 px-6 lg:px-12 py-12 pb-28">
+        <main className="min-h-screen transition-colors duration-300 px-4 sm:px-6 lg:px-12 pt-24 pb-28">
             <FloatingNav />
 
             {/* Header */}
@@ -156,7 +157,7 @@ export default function DashboardPage() {
                         Explore Projects
                     </h1>
                     <p className="text-sm font-mono text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
-                        Browse active campaigns on the GIBMONI protocol. All data pulled directly from the Solana ledger, enriched with off-chain metadata when available.
+                        Browse active campaigns on the protocol. All data pulled directly from the Solana ledger, enriched with off-chain metadata when available.
                     </p>
                 </div>
 
@@ -207,18 +208,15 @@ export default function DashboardPage() {
 
                 {/* Loading */}
                 {loading && (
-                    <div className="flex flex-col items-center justify-center py-32">
-                        <Loader2 className="w-8 h-8 text-[#ea580c] animate-spin mb-4" />
-                        <p className="text-sm font-mono text-zinc-500 dark:text-zinc-400">
-                            LOADING ON-CHAIN NODES...
-                        </p>
+                    <div className="py-32">
+                        <BrutalistLoader text="LOADING ON-CHAIN NODES..." />
                     </div>
                 )}
 
                 {/* Empty State */}
                 {!loading && filteredProjects.length === 0 && (
-                    <div className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 p-20 flex flex-col items-center justify-center">
-                        <Box className="w-14 h-14 text-zinc-300 dark:text-zinc-700 mb-6" />
+                    <div className="bg-zinc-50 dark:bg-zinc-950 border-2 border-dashed border-zinc-300 dark:border-zinc-800 p-20 flex flex-col items-center justify-center">
+                        <div className="w-14 h-14 border-2 border-zinc-300 dark:border-zinc-700 mb-6" />
                         <h3 className="font-pixel text-xl text-zinc-600 dark:text-zinc-400 uppercase mb-3">
                             No Projects Found
                         </h3>

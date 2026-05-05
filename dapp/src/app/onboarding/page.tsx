@@ -6,6 +6,8 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { Loader2 } from 'lucide-react';
 import { WalletButton } from "../context/solanaProvider";
 import { useGibmoniProgram } from '../hooks/useAnchorQueries';
+import FloatingNav from '@/components/floatingNav';
+import { BrutalistLoader } from '@/components/brutalistLoader';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || '';
@@ -242,7 +244,7 @@ function OnboardingContent() {
     const currentStepIndex = STEPS.indexOf(step);
 
     return (
-        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 transition-colors duration-300 pt-24">
+        <main className="min-h-screen flex flex-col items-center justify-center p-6 transition-colors duration-300 pt-24">
 
             <div className="w-full max-w-md bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-800 transition-all duration-300 relative z-10">
 
@@ -289,12 +291,7 @@ function OnboardingContent() {
 
                     {/* ── Loading Overlay ──────────────────────── */}
                     {isLoading && step !== 'CREATE_ACCOUNT' && (
-                        <div className="flex flex-col items-center text-center py-8">
-                            <Loader2 className="w-8 h-8 text-[#ea580c] animate-spin mb-6" />
-                            <p className="text-sm font-mono text-zinc-500 dark:text-zinc-400">
-                                {loadingMessage || 'Processing...'}
-                            </p>
-                        </div>
+                        <BrutalistLoader text={loadingMessage || 'Processing...'} />
                     )}
 
                     {/* ── Error Display ────────────────────────── */}
@@ -546,8 +543,8 @@ function OnboardingContent() {
 export default function OnboardingPage() {
     return (
         <Suspense fallback={
-            <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-[#ea580c] animate-spin" />
+            <main className="min-h-screen flex flex-col items-center justify-center p-6">
+                <BrutalistLoader />
             </main>
         }>
             <OnboardingContent />

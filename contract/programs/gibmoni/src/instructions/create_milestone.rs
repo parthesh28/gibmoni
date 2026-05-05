@@ -1,6 +1,9 @@
 use crate::{
     errors::Error,
-    state::{PROJECT_SEED, Project, ProjectState, TREASURY_SEED, Treasury, USER_SEED, User, VAULT_SEED, Vault, milestone::*},
+    state::{
+        milestone::*, Project, ProjectState, Treasury, User, Vault, PROJECT_SEED, TREASURY_SEED,
+        USER_SEED, VAULT_SEED,
+    },
 };
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::{prelude::*, InstructionData};
@@ -113,6 +116,12 @@ impl<'info> CreateMilestone<'info> {
             Error::InvalidMilestoneOrder
         );
 
+        require!(
+            self.project.milestones_posted == 0
+                || self.project.milestones_completed == self.project.milestones_posted,
+            Error::PreviousMilestoneNotApproved
+        );
+
         self.milestone.set_inner(Milestone {
             project_id: self.project.key(),
             attempt_number: 1,
@@ -137,7 +146,7 @@ impl<'info> CreateMilestone<'info> {
                     milestone: self.milestone.key(),
                     user: self.user.key(),
                     vault: self.vault.key(),
-                    treasury: self.treasury.key(), 
+                    treasury: self.treasury.key(),
                     project_authority: self.milestone_authority.key(),
                     system_program: self.system_program.key(),
                 }
@@ -148,7 +157,7 @@ impl<'info> CreateMilestone<'info> {
             vec![],
         )
         .unwrap();
-    
+
         queue_task_v0(
             CpiContext::new_with_signer(
                 self.tuktuk_program.to_account_info(),

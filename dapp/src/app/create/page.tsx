@@ -9,6 +9,7 @@ import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import { WalletButton } from '../context/solanaProvider';
 import FloatingNav from '@/components/floatingNav';
+import { BrutalistLoader } from '@/components/brutalistLoader';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
 
@@ -123,7 +124,7 @@ export default function CreateProjectPage() {
     // Not connected
     if (!connected || !publicKey) {
         return (
-            <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 transition-colors duration-300">
+            <main className="min-h-screen flex flex-col items-center justify-center p-6 transition-colors duration-300">
                 <FloatingNav />
                 <div className="w-full max-w-md border-2 border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
                     <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-zinc-300 dark:border-zinc-800 bg-zinc-200/50 dark:bg-zinc-900/50">
@@ -150,7 +151,7 @@ export default function CreateProjectPage() {
     }
 
     return (
-        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300 px-6 lg:px-12 py-12 pb-28">
+        <main className="min-h-screen transition-colors duration-300 px-4 sm:px-6 lg:px-12 pt-24 pb-28">
             <FloatingNav />
 
             <div className="max-w-3xl mx-auto">
@@ -193,8 +194,8 @@ export default function CreateProjectPage() {
 
                 {/* Signing / Posting States */}
                 {(step === 'SIGNING' || step === 'POSTING') && (
-                    <div className="border-2 border-zinc-300 dark:border-zinc-800 p-16 flex flex-col items-center text-center">
-                        <Loader2 className="w-10 h-10 text-[#ea580c] animate-spin mb-6" />
+                    <div className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 p-16 flex flex-col items-center text-center">
+                        <BrutalistLoader text="" />
                         <h2 className="font-pixel text-2xl text-zinc-900 dark:text-zinc-100 mb-3 uppercase">
                             {step === 'SIGNING' ? 'Awaiting Signature' : 'Posting Metadata'}
                         </h2>

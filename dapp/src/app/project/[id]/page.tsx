@@ -2,12 +2,24 @@
 
 import React, { useEffect, useState, use } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { Terminal, Loader2, AlertTriangle, ArrowLeft, Clock, CheckCircle2, XCircle, Coins, Plus } from 'lucide-react';
 import { useGibmoniProgram } from '../../hooks/useAnchorQueries';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import Link from 'next/link';
 import FloatingNav from '@/components/floatingNav';
+import { BrutalistLoader } from '@/components/brutalistLoader';
+
+function CopyButton({ text }: { text: string }) {
+    const [copied, setCopied] = useState(false);
+    const handleCopy = async () => {
+        try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { }
+    };
+    return (
+        <button onClick={handleCopy} className="ml-2 text-[9px] font-mono tracking-widest uppercase text-zinc-400 hover:text-[#ea580c] transition-colors duration-200 shrink-0" title="Copy">
+            {copied ? '[ COPIED ]' : '[ COPY ]'}
+        </button>
+    );
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
 
@@ -100,13 +112,13 @@ function getMilestoneBadge(status: string) {
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const { publicKey, connected } = useWallet();
-    const { program, contributeFund, createMilestone, voteOnMilestone } = useGibmoniProgram();
+    const { program, contributeFund, createMilestone, cancelUnfundedProject, claimRefund } = useGibmoniProgram();
 
     const [offChainData, setOffChainData] = useState<OffChainProject | null>(null);
     const [onChainData, setOnChainData] = useState<OnChainProjectData | null>(null);
     const [onChainMilestones, setOnChainMilestones] = useState<Map<number, OnChainMilestoneData>>(new Map());
-    const [userVotes, setUserVotes] = useState<Map<number, boolean>>(new Map());
     const [hasContribution, setHasContribution] = useState(false);
+    const [isRefunded, setIsRefunded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -119,9 +131,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const [milestoneTitle, setMilestoneTitle] = useState('');
     const [milestoneDescription, setMilestoneDescription] = useState('');
     const [availableMilestoneIndex, setAvailableMilestoneIndex] = useState<number>(0);
-    // Vote modal state
-    const [showVoteModal, setShowVoteModal] = useState(false);
-    const [votingMilestoneIndex, setVotingMilestoneIndex] = useState(0);
+    // Vote modal state (Removed - moved to dedicated milestone page)
     const [actionLoading, setActionLoading] = useState(false);
 
     const projectPda = new PublicKey(id);
@@ -163,25 +173,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         );
                         const msAccount = await program.account.milestone.fetch(milestonePda);
                         msMap.set(i, msAccount as any);
-
-                        // Check if current user voted on this milestone attempt
-                        if (publicKey) {
-                            try {
-                                const [votePda] = PublicKey.findProgramAddressSync(
-                                    [Buffer.from("VOTE"), milestonePda.toBuffer(), publicKey.toBuffer()],
-                                    program.programId
-                                );
-                                const voteAccount = await program.account.vote.fetch(votePda);
-                                // Set true ONLY if the vote attempt count matches the current milestone attempt number
-                                votesMap.set(i, voteAccount.attemptCount === (msAccount as any).attemptNumber);
-                            } catch {
-                                votesMap.set(i, false);
-                            }
-                        }
                     } catch { }
                 }
                 setOnChainMilestones(msMap);
-                setUserVotes(votesMap);
                 
                 // Find next available milestone index for creation (first index not in msMap)
                 let nextAvailable = 0;
@@ -213,10 +207,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     [Buffer.from("CONTRIBUTION"), publicKey.toBuffer(), projectPda.toBuffer()],
                     program.programId
                 );
-                await program.account.contribution.fetch(contributionPda);
+                const contrib = await program.account.contribution.fetch(contributionPda);
                 setHasContribution(true);
+                setIsRefunded(contrib.refunded);
             } catch {
                 setHasContribution(false);
+                setIsRefunded(false);
             }
         }
         checkContribution();
@@ -305,51 +301,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         }
     };
 
-    const handleVote = async (decision: boolean) => {
-        if (!onChainData || !publicKey) return;
-        setActionLoading(true);
-        try {
-            await voteOnMilestone.mutateAsync({
-                projectName: onChainData.projectName,
-                projectAuthority: onChainData.projectAuthority,
-                typeIndex: votingMilestoneIndex,
-                decision,
-            });
-            setShowVoteModal(false);
-            try {
-                const [msPda] = PublicKey.findProgramAddressSync(
-                    [Buffer.from("MILESTONE"), onChainData.projectAuthority.toBuffer(), projectPda.toBuffer(), Buffer.from([votingMilestoneIndex])],
-                    program.programId
-                );
-                const msAccount = await program.account.milestone.fetch(msPda);
-                setOnChainMilestones(prev => new Map(prev).set(votingMilestoneIndex, msAccount as any));
-                setUserVotes(prev => new Map(prev).set(votingMilestoneIndex, true));
-            } catch { }
-        } catch (err) {
-            console.error('Vote error:', err);
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
     if (loading) {
         return (
-            <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+            <main className="min-h-screen flex flex-col items-center justify-center">
                 <FloatingNav />
-                <div className="text-center">
-                    <Loader2 className="w-8 h-8 text-[#ea580c] animate-spin mx-auto mb-4" />
-                    <p className="text-sm font-mono text-zinc-500 dark:text-zinc-400">LOADING PROJECT NODE...</p>
-                </div>
+                <BrutalistLoader text="LOADING PROJECT NODE..." />
             </main>
         );
     }
 
     if (error && !onChainData) {
         return (
-            <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center px-4">
+            <main className="min-h-screen flex items-center justify-center px-4">
                 <FloatingNav />
                 <div className="border-2 border-red-500/30 p-12 max-w-md text-center">
-                    <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+                    <span className="text-3xl font-mono text-red-500 block mb-4">!</span>
                     <p className="text-sm font-mono text-red-500 mb-6">{error}</p>
                     <Link href="/dashboard" className="text-[10px] font-mono tracking-widest uppercase text-zinc-500 hover:text-[#ea580c] transition-colors">
                         ← BACK TO EXPLORE
@@ -360,14 +326,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     }
 
     return (
-        <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300 px-6 lg:px-12 py-12 pb-28">
+        <main className="min-h-screen transition-colors duration-300 px-4 sm:px-6 lg:px-12 pt-24 pb-28">
             <FloatingNav />
 
             <div className="max-w-6xl mx-auto flex flex-col gap-6">
                 {/* Back link */}
                 <Link href="/dashboard" className="inline-flex items-center gap-2 text-[10px] font-mono tracking-widest uppercase text-zinc-500 dark:text-zinc-400 hover:text-[#ea580c] transition-colors mb-2">
-                    <ArrowLeft className="w-3 h-3" />
-                    BACK TO EXPLORE
+                    ← BACK TO EXPLORE
                 </Link>
 
                 {/* Grid Layout Container */}
@@ -375,13 +340,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     {/* Left Column (Main Info) */}
                     <div className="flex-1 flex flex-col gap-6 w-full">
                         {/* Title Bar */}
-                        <div className="border-2 border-zinc-300 dark:border-zinc-800 p-8 lg:p-10 flex flex-col md:flex-row md:items-start justify-between gap-6 w-full shadow-[8px_8px_0_0_#27272a] dark:shadow-none bg-zinc-100 dark:bg-zinc-900/20">
+                        <div className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 p-8 lg:p-10 flex flex-col md:flex-row md:items-start justify-between gap-6 w-full">
                             <div className="flex flex-col gap-2">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <Terminal className="w-5 h-5 text-[#ea580c]" />
+                                <div className="flex flex-wrap items-center gap-3 mb-2">
                                     <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-zinc-400 dark:text-zinc-500">
                                         PROJECT // {id.slice(0, 8)}...{id.slice(-4)}
                                     </span>
+                                    <CopyButton text={id} />
                                     <span className={`text-[10px] font-mono tracking-widest uppercase px-3 py-1 border ${getStateBadge(projectState)}`}>
                                         {projectState}
                                     </span>
@@ -406,21 +371,60 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             {/* Creator / Role Badge */}
                             <div className="flex items-center gap-3 mt-2 md:mt-0">
                                 {isCreator ? (
-                                    <div className="px-4 py-2 border border-[#ea580c] text-[#ea580c] text-[10px] font-mono tracking-widest uppercase flex items-center gap-2">
-                                        <Terminal className="w-3.5 h-3.5" />
+                                    <span className="px-4 py-2 border border-[#ea580c] text-[#ea580c] text-[10px] font-mono tracking-widest uppercase">
                                         CREATOR
-                                    </div>
+                                    </span>
                                 ) : (
-                                    <div className="px-4 py-2 border border-zinc-400 text-zinc-500 text-[10px] font-mono tracking-widest uppercase flex items-center gap-2">
+                                    <span className="px-4 py-2 border border-zinc-400 text-zinc-500 text-[10px] font-mono tracking-widest uppercase">
                                         FUNDER
-                                    </div>
+                                    </span>
                                 )}
                             </div>
                         </div>
 
+                        {/* Project Stats Grid */}
+                        {onChainData && (
+                            <div className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 p-8 lg:p-10">
+                                <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500 block mb-6">ON-CHAIN STATE</span>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-5">
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-400">Project Name</span>
+                                        <span className="text-sm font-mono text-zinc-800 dark:text-zinc-200">{onChainData.projectName}</span>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-400">Funders</span>
+                                        <span className="text-sm font-mono text-zinc-800 dark:text-zinc-200">{onChainData.funderCount}</span>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-400">Milestones</span>
+                                        <span className="text-sm font-mono text-zinc-800 dark:text-zinc-200">{onChainData.milestonesCompleted} / {onChainData.milestonesPosted} completed</span>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-400">Funding Deadline</span>
+                                        <span className="text-sm font-mono text-zinc-800 dark:text-zinc-200">
+                                            {new Date(Number(onChainData.fundingDeadline) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </span>
+                                        {new Date().getTime() / 1000 > Number(onChainData.fundingDeadline) && projectState === 'Funding' && (
+                                            <span className="text-[9px] font-mono text-red-500 uppercase">EXPIRED</span>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-400">Delivery Deadline</span>
+                                        <span className="text-sm font-mono text-zinc-800 dark:text-zinc-200">
+                                            {new Date(Number(onChainData.deliveryDeadline) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-400">Target Amount</span>
+                                        <span className="text-sm font-mono text-zinc-800 dark:text-zinc-200">{targetSol.toFixed(2)} SOL</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Description */}
                         {offChainData?.description && (
-                            <div className="border-2 border-zinc-300 dark:border-zinc-800 p-8 lg:p-10">
+                            <div className="bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-800 p-8 lg:p-10">
                                 <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500 block mb-6">PROJECT // README</span>
                                 <div className="text-sm font-mono text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap max-w-3xl">
                                     {offChainData.description}
@@ -433,7 +437,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <div className="w-full xl:w-[350px] flex flex-col gap-6 shrink-0">
                         {/* Vault Card */}
                         {onChainData && (
-                            <div className="border-2 border-zinc-300 dark:border-zinc-800 p-6 flex flex-col gap-6">
+                            <div className="bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-800 p-6 flex flex-col gap-6">
                                 <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500 block">VAULT STATUS</span>
 
                                 <div className="flex justify-between items-end">
@@ -450,35 +454,107 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                     <span>{withdrawnSol.toFixed(2)} withdrawn</span>
                                 </div>
 
+                                {/* Deadline countdown */}
+                                {projectState === 'Funding' && (
+                                    <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 flex flex-col gap-1">
+                                        <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400">FUNDING CLOSES</span>
+                                        <span className="text-xs font-mono text-zinc-700 dark:text-zinc-300">
+                                            {new Date(Number(onChainData.fundingDeadline) * 1000).toLocaleString()}
+                                        </span>
+                                        {new Date().getTime() / 1000 > Number(onChainData.fundingDeadline) && (
+                                            <span className="text-[9px] font-mono text-red-500 uppercase mt-1">DEADLINE PASSED</span>
+                                        )}
+                                    </div>
+                                )}
+
+                                {projectState === 'Development' && (
+                                    <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 flex flex-col gap-1">
+                                        <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400">DELIVERY DUE</span>
+                                        <span className="text-xs font-mono text-zinc-700 dark:text-zinc-300">
+                                            {new Date(Number(onChainData.deliveryDeadline) * 1000).toLocaleString()}
+                                        </span>
+                                    </div>
+                                )}
+
                                 {/* Contextual Fund Action */}
                                 {connected && projectState === 'Funding' && (
                                     <button
                                         onClick={() => setShowFundModal(true)}
-                                        className="w-full mt-2 py-3 border border-[#ea580c] text-[#ea580c] hover:bg-[#ea580c] hover:text-white text-[10px] font-mono tracking-widest uppercase transition-all duration-200 flex items-center justify-center gap-2"
+                                        className="w-full mt-2 py-3 border border-[#ea580c] text-[#ea580c] hover:bg-[#ea580c] hover:text-white text-[10px] font-mono tracking-widest uppercase transition-all duration-200"
                                     >
-                                        <Coins className="w-3.5 h-3.5" />
-                                        [ FUND_PROJECT ]
+                                        FUND PROJECT
                                     </button>
+                                )}
+
+                                {/* Cancel Unfunded Project */}
+                                {connected && projectState === 'Funding' && onChainData && new Date().getTime() / 1000 > Number(onChainData.fundingDeadline) && collectedSol < targetSol && (
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await cancelUnfundedProject.mutateAsync({
+                                                    projectName: onChainData.projectName,
+                                                    projectAuthority: onChainData.projectAuthority,
+                                                });
+                                                const updated = await program.account.project.fetch(projectPda);
+                                                setOnChainData(updated as any);
+                                            } catch (err) {
+                                                console.error('Cancel error:', err);
+                                            }
+                                        }}
+                                        disabled={cancelUnfundedProject.isPending}
+                                        className="w-full mt-2 py-3 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white text-[10px] font-mono tracking-widest uppercase transition-all duration-200"
+                                    >
+                                        {cancelUnfundedProject.isPending ? 'CANCELLING...' : 'CANCEL UNFUNDED PROJECT'}
+                                    </button>
+                                )}
+
+                                {/* Claim Refund */}
+                                {connected && projectState === 'Failed' && hasContribution && !isRefunded && (
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await claimRefund.mutateAsync({
+                                                    projectName: onChainData.projectName,
+                                                    projectAuthority: onChainData.projectAuthority,
+                                                });
+                                                setIsRefunded(true);
+                                            } catch (err) {
+                                                console.error('Refund error:', err);
+                                            }
+                                        }}
+                                        disabled={claimRefund.isPending}
+                                        className="w-full mt-2 py-3 border border-green-500 text-green-500 hover:bg-green-500 hover:text-white text-[10px] font-mono tracking-widest uppercase transition-all duration-200"
+                                    >
+                                        {claimRefund.isPending ? 'CLAIMING...' : 'CLAIM REFUND'}
+                                    </button>
+                                )}
+
+                                {connected && projectState === 'Failed' && hasContribution && isRefunded && (
+                                    <div className="w-full mt-2 py-3 border border-zinc-500 text-zinc-500 text-[10px] font-mono tracking-widest uppercase text-center cursor-not-allowed">
+                                        REFUND CLAIMED
+                                    </div>
                                 )}
                             </div>
                         )}
 
                         {/* Network Details */}
-                        <div className="border-2 border-zinc-300 dark:border-zinc-800 p-6 flex flex-col gap-5">
+                        <div className="bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-800 p-6 flex flex-col gap-5">
                             <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500 block">NETWORK DETAILS</span>
 
                             <div className="flex flex-col gap-1.5">
                                 <span className="text-[10px] text-zinc-500 font-mono tracking-widest uppercase">Project ID</span>
-                                <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 text-sm font-mono text-zinc-700 dark:text-zinc-300">
-                                    {id.slice(0, 8)}...{id.slice(-8)}
+                                <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 text-sm font-mono text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                                    <span>{id.slice(0, 8)}...{id.slice(-8)}</span>
+                                    <CopyButton text={id} />
                                 </div>
                             </div>
 
                             {onChainData && (
                                 <div className="flex flex-col gap-1.5">
                                     <span className="text-[10px] text-zinc-500 font-mono tracking-widest uppercase">Authority</span>
-                                    <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 text-sm font-mono text-zinc-700 dark:text-zinc-300">
-                                        {onChainData.projectAuthority.toBase58().slice(0, 8)}...{onChainData.projectAuthority.toBase58().slice(-8)}
+                                    <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 text-sm font-mono text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                                        <span>{onChainData.projectAuthority.toBase58().slice(0, 8)}...{onChainData.projectAuthority.toBase58().slice(-8)}</span>
+                                        <CopyButton text={onChainData.projectAuthority.toBase58()} />
                                     </div>
                                 </div>
                             )}
@@ -487,25 +563,36 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 </div>
 
                 {/* Milestone Timeline Array */}
-                <div className="border-2 border-zinc-300 dark:border-zinc-800 p-8 lg:p-10 mt-2">
+                <div className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 p-8 lg:p-10">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                        <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500 flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-[#ea580c]" />
+                        <span className="text-[9px] font-mono tracking-widest uppercase text-zinc-400 dark:text-zinc-500">
                             MILESTONES // TIMELINE
                         </span>
 
                         {/* Contextual Action: Add Milestone */}
-                        {connected && projectState === 'Development' && isCreator && onChainData && onChainData.milestonesPosted < 4 && (
-                            <button
-                                onClick={() => {
-                                    setMilestoneType(availableMilestoneIndex);
-                                    setShowMilestoneModal(true);
-                                }}
-                                className="px-6 py-3 border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-white text-[10px] font-mono tracking-widest uppercase transition-all duration-200 flex items-center gap-2"
-                            >
-                                <Plus className="w-3.5 h-3.5" />
-                                [ ADD_MILESTONE ]
-                            </button>
+                        {connected && projectState === 'Development' && isCreator && onChainData && onChainData.milestonesPosted < 4 && (() => {
+                            const canPost = onChainData.milestonesPosted === 0 || onChainData.milestonesCompleted === onChainData.milestonesPosted;
+                            return canPost ? (
+                                <button
+                                    onClick={() => {
+                                        setMilestoneType(availableMilestoneIndex);
+                                        setShowMilestoneModal(true);
+                                    }}
+                                    className="px-6 py-3 border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-white text-[10px] font-mono tracking-widest uppercase transition-all duration-200"
+                                >
+                                    ADD MILESTONE
+                                </button>
+                            ) : (
+                                <span className="px-6 py-3 border border-zinc-500 text-zinc-500 text-[10px] font-mono tracking-widest uppercase cursor-not-allowed">
+                                    AWAITING PREVIOUS APPROVAL
+                                </span>
+                            );
+                        })()}
+
+                        {connected && projectState === 'Failed' && isCreator && (
+                            <span className="px-6 py-3 border border-red-500/50 text-red-500 text-[10px] font-mono tracking-widest uppercase cursor-not-allowed">
+                                PROJECT FAILED
+                            </span>
                         )}
                     </div>
 
@@ -562,27 +649,17 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                         </div>
                                     )}
 
-                                    {/* Status icon */}
-                                    <div className="absolute top-5 right-5">
-                                        {status === 'Approved' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                                        {status === 'Disapproved' && <XCircle className="w-4 h-4 text-red-500" />}
-                                        {isVoting && <Clock className="w-4 h-4 text-yellow-500 animate-pulse" />}
-                                    </div>
 
-                                    {/* Vote button (Contextual) */}
-                                    {isVoting && hasContribution && connected && !isCreator && (
-                                        <button
-                                            disabled={userVotes.get(index)}
-                                            onClick={() => { setVotingMilestoneIndex(index); setShowVoteModal(true); }}
-                                            className={`mt-2 w-full py-2.5 text-[9px] font-mono tracking-widest uppercase border transition-all flex items-center justify-center gap-2 ${
-                                                userVotes.get(index) 
-                                                    ? 'border-zinc-700 text-zinc-500 bg-zinc-900/50 cursor-not-allowed opacity-50' 
-                                                    : 'border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-white'
-                                            }`}
+
+
+                                    {/* View Details Link */}
+                                    {isActive && (
+                                        <Link
+                                            href={`/project/${id}/milestone/${index}`}
+                                            className="mt-2 w-full flex items-center justify-center py-2.5 text-[9px] font-mono tracking-widest uppercase border transition-all border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-500 dark:hover:border-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
                                         >
-                                            <Terminal className="w-3.5 h-3.5" />
-                                            {userVotes.get(index) ? '[ VOTE_CAST ]' : '[ CAST_VOTE ]'}
-                                        </button>
+                                            VIEW DETAILS
+                                        </Link>
                                     )}
                                 </div>
                             );
@@ -683,36 +760,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                 )}
 
-                {/* ===== VOTE MODAL ===== */}
-                {showVoteModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <div className="absolute inset-0 bg-zinc-950/60 backdrop-blur-sm" onClick={() => setShowVoteModal(false)} />
-                        <div className="w-full max-w-sm bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-800 shadow-[8px_8px_0_0_#27272a] relative z-10">
-                            <div className="px-5 py-3 border-b-2 border-zinc-300 dark:border-zinc-800 bg-zinc-200/50 dark:bg-zinc-900/50">
-                                <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-600 dark:text-zinc-400">VOTE // MS-{votingMilestoneIndex} ({MILESTONE_TYPES[votingMilestoneIndex]})</span>
-                            </div>
-                            <div className="p-6">
-                                <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400 mb-6">
-                                    Cast your governance vote. Weight is determined by contribution amount and reputation score.
-                                </p>
-                                <div className="flex gap-2">
-                                    <button onClick={() => handleVote(true)} disabled={actionLoading}
-                                        className="flex-1 bg-green-600 text-white py-3 text-[10px] font-mono tracking-widest uppercase hover:bg-green-700 transition-colors disabled:opacity-50">
-                                        {actionLoading ? '...' : '[ APPROVE ]'}
-                                    </button>
-                                    <button onClick={() => handleVote(false)} disabled={actionLoading}
-                                        className="flex-1 bg-red-600 text-white py-3 text-[10px] font-mono tracking-widest uppercase hover:bg-red-700 transition-colors disabled:opacity-50">
-                                        {actionLoading ? '...' : '[ REJECT ]'}
-                                    </button>
-                                </div>
-                                <button onClick={() => setShowVoteModal(false)}
-                                    className="mt-3 w-full py-2 text-[10px] font-mono tracking-widest uppercase text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-                                    [ CANCEL ]
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Vote modal moved to dedicated milestone page */}
             </div>
         </main>
     );

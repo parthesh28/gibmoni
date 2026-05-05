@@ -16,7 +16,7 @@ import Navbar from '@/components/navbar'
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable} ${GeistPixelSquare.variable}`}>
-      <body className={`antialiased`}>
+      <body className={`antialiased bg-grid-pattern relative min-h-screen`}>
         <AppProviders>
           <Navbar />
           {children}
@@ -26,7 +26,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   )
 }
 
-// Patch BigInt so we can log it using JSON.stringify without any errors
 declare global {
   interface BigInt {
     toJSON(): string

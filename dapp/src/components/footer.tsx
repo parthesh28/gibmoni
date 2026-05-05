@@ -10,35 +10,17 @@ export function Footer() {
                     {/* Left Side: Brand & Copyright */}
                     <div className="flex gap-4 items-baseline font-mono">
                         <span className="text-sm font-bold tracking-widest text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
-                            GIBMONI
+                            SFIT
                         </span>
                         <span className="text-xs tracking-widest text-zinc-500 dark:text-zinc-500 transition-colors duration-300">
-                            (C) {new Date().getFullYear()} PARTHESH28.
+                            (C) {new Date().getFullYear()} CMPN_B11
                         </span>
                     </div>
 
                     {/* Right Side: Simple Link Row */}
                     <div className="flex flex-wrap items-center gap-6 sm:gap-8 font-mono text-xs tracking-widest text-zinc-500 dark:text-zinc-500">
-                        <Link
-                            href="/privacy"
-                            className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors duration-200 uppercase"
-                        >
-                            Privacy
-                        </Link>
-                        <Link
-                            href="/terms"
-                            className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors duration-200 uppercase"
-                        >
-                            Terms
-                        </Link>
-                        <Link
-                            href="/status"
-                            className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors duration-200 uppercase"
-                        >
-                            Status
-                        </Link>
                         <a
-                            href="https://github.com/parthesh28"
+                            href="https://github.com/parthesh28/gibmoni"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors duration-200 uppercase"
