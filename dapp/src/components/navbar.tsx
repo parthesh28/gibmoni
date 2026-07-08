@@ -27,7 +27,7 @@ export default function Navbar() {
                                 {`$`}
                             </span>
                             <span className="text-sm sm:text-base tracking-[0.15em] text-zinc-900 dark:text-zinc-100 font-pixel transition-colors duration-300">
-                                ASSUREFUND  
+                                GibMoni
                             </span>
                         </Link>
 

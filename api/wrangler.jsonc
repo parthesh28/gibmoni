@@ -38,7 +38,6 @@
 	 * Note: Use secrets to store sensitive data.
 	 * https://developers.cloudflare.com/workers/configuration/secrets/
 	 */
-	"vars": {  "ORACLE_PRIVATE_KEY": "[105,191,60,202,195,184,202,40,34,117,252,160,131,229,69,129,12,255,179,166,68,247,51,200,48,142,77,109,120,23,88,96,141,222,144,95,141,213,119,47,33,17,149,51,73,77,79,124,226,65,47,7,68,155,64,53,15,99,219,178,171,231,90,76]" }
 	/**
 	 * Static Assets
 	 * https://developers.cloudflare.com/workers/static-assets/binding/
