@@ -1,7 +1,7 @@
 import { AnchorProvider, Program } from '@coral-xyz/anchor'
 import { Cluster, PublicKey } from '@solana/web3.js'
 import GibMoniIDL from '../../../gibmoni.json'
-import type { Gibmoni } from '../../../../contract/target/types/gibmoni'
+import type { Gibmoni } from '../../../gibmoni'
 
 export { Gibmoni, GibMoniIDL }
 
